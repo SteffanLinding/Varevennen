@@ -1,0 +1,36 @@
+:root {
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px; --space-3xl: 96px; --space-4xl: 144px;
+  --text-xs: 0.875rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-xl: 1.44rem; --text-2xl: 1.728rem; --text-3xl: 2.074rem;
+  --text-num-s: 1.5rem; --text-num: 2.986rem; --text-num-xl: 7.25rem;
+  --text-display-s: 1.44rem; --text-display: 1.728rem; --text-section: 1.2rem; --text-title: 1rem; --text-lead: 1rem;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in: cubic-bezier(0.7, 0, 0.84, 0); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+  --color-error: oklch(52% 0.19 27); --color-success: oklch(50% 0.12 150);
+  --container: 72rem; --gutter: 40px; --column: 40rem; --tabbar: 64px; --control: 48px; --gap-columns: 32px; --section-gap-s: 120px; --section-gap: 144px; --section-gap-l: 176px;
+  --z-base: 1; --z-raised: 10; --z-dropdown: 100; --z-sticky: 200; --z-sticky-nav: 300; --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
+  --color-bg: oklch(95.6% 0.006 330); --color-paper: oklch(99.3% 0.002 330); --color-paper-2: oklch(94.6% 0.007 330); --color-paper-3: oklch(90.5% 0.009 330);
+  --color-ink: oklch(19% 0.012 330); --color-ink-2: oklch(34% 0.012 330); --color-muted: oklch(46% 0.012 330);
+  --color-rule: oklch(86% 0.008 330); --color-night: oklch(17% 0.012 330); --color-night-ink: oklch(95% 0.006 330);
+  --color-accent: oklch(50% 0.2 330); --color-accent-ink: oklch(98% 0.004 330); --color-focus: oklch(52% 0.21 330); --color-accent-soft: oklch(93% 0.04 330);
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif; --font-body: "Archivo", ui-sans-serif, system-ui, sans-serif; --font-outlier: var(--font-body);
+  --radius-card: 16px; --radius-input: 12px; --radius-mark: 6px; --radius-pill: 999px; --rule-hair: 1px; --shadow-card: 0 1px 2px oklch(20% 0.02 330 / 0.06), 0 0 0 1px oklch(20% 0.02 330 / 0.04); --shadow-float: 0 8px 28px oklch(20% 0.03 330 / 0.16), 0 1px 3px oklch(20% 0.03 330 / 0.1);
+  --tracking-display: -0.01em;
+}
+
+:root { color-scheme: light dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --color-bg: oklch(13% 0.01 330); --color-paper: oklch(18.5% 0.012 330); --color-paper-2: oklch(22% 0.012 330); --color-paper-3: oklch(26% 0.012 330);
+  --color-ink: oklch(94% 0.008 330); --color-ink-2: oklch(80% 0.01 330); --color-muted: oklch(68% 0.01 330);
+  --color-rule: oklch(31% 0.012 330); --color-night: oklch(11% 0.01 330); --color-night-ink: oklch(95% 0.006 330);
+  --color-accent: oklch(66% 0.17 330); --color-accent-ink: oklch(16% 0.012 330); --color-focus: oklch(68% 0.18 330); --color-accent-soft: oklch(28% 0.06 330);
+  --color-error: oklch(68% 0.16 27); --color-success: oklch(70% 0.12 150);
+  }
+}
+:root[data-theme="dark"] {
+  --color-bg: oklch(13% 0.01 330); --color-paper: oklch(18.5% 0.012 330); --color-paper-2: oklch(22% 0.012 330); --color-paper-3: oklch(26% 0.012 330);
+  --color-ink: oklch(94% 0.008 330); --color-ink-2: oklch(80% 0.01 330); --color-muted: oklch(68% 0.01 330);
+  --color-rule: oklch(31% 0.012 330); --color-night: oklch(11% 0.01 330); --color-night-ink: oklch(95% 0.006 330);
+  --color-accent: oklch(66% 0.17 330); --color-accent-ink: oklch(16% 0.012 330); --color-focus: oklch(68% 0.18 330); --color-accent-soft: oklch(28% 0.06 330);
+  --color-error: oklch(68% 0.16 27); --color-success: oklch(70% 0.12 150);
+}

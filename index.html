@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f4f6">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#141013">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Vareven">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<title>Vareven</title>
+<meta name="description" content="Indkøbslisten hvor hver vare har et varekort med prio 1 til 3, så den handlende køber præcis den variant, I plejer.">
+<link rel="preload" href="./fonts/archivo-wdth.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="./app.css">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Spring til indhold</a>
+<header class="topbar">
+  <div class="topbar__in">
+    <a class="wordmark" href="#/indkob" aria-label="Vareven, til indkøbslisten">Vareven</a>
+    <nav class="tabs" aria-label="Hovedmenu">
+      <a class="tab" href="#/retter" data-tab="retter">Retter</a>
+      <a class="tab" href="#/indkob" data-tab="indkob">Indkøb</a>
+      <a class="tab" href="#/katalog" data-tab="katalog">Katalog</a>
+      <a class="tab" href="#/mine" data-tab="mine">Mine varer</a>
+    </nav>
+    <p class="status" id="status" role="status"></p>
+    <a class="profbtn" href="#/profil" data-tab="profil" aria-label="Profil og indstillinger"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c.9-3.6 3.9-5.6 7.5-5.6s6.6 2 7.5 5.6"/></svg><span class="profbtn__txt">Profil</span></a>
+  </div>
+</header>
+
+<main id="main">
+  <noscript><p>Appen kræver JavaScript for at vise listen.</p></noscript>
+</main>
+
+<nav class="tabbar" aria-label="Hovedmenu">
+  <a href="#/retter" data-tab="retter"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M9 7c0-1.5 1-2 1-3.5M14 7c0-1.5 1-2 1-3.5"/></svg>Retter</a>
+  <a href="#/indkob" data-tab="indkob"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h2l2.2 10.2a1 1 0 0 0 1 .8h8.6a1 1 0 0 0 1-.8L20 8H6.2"/><circle cx="9" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg>Indkøb</a>
+  <a href="#/katalog" data-tab="katalog"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Katalog</a>
+  <a href="#/mine" data-tab="mine"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h3M4 12h3M4 18h3"/><rect x="10" y="4" width="10" height="4" rx="1"/><rect x="10" y="10" width="10" height="4" rx="1"/><rect x="10" y="16" width="10" height="4" rx="1"/></svg>Mine varer</a>
+</nav>
+
+<script src="./data.js"></script>
+<script src="./produkter.js"></script>
+<script src="./rens.js"></script>
+<script src="./retter-billeder.js"></script>
+<script src="./opskrifter.js"></script>
+<script src="./opskriftsbank.js"></script>
+<script src="./bank-billeder.js"></script>
+<script src="./illustrationer.js"></script>
+<script src="./teknikker.js"></script>
+<script src="./videoer.js"></script>
+<script src="./priser.js"></script>
+<script src="./pdf-maker.js"></script>
+<script src="./scanner.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
