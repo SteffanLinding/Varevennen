@@ -12,7 +12,7 @@
     const W = wmm * MM, H = hmm * MM, pad = (fmt === 'telefon' ? 7 : 14) * MM;
     const small = fmt === 'telefon';
     const pdf = await PDFDocument.create();
-    pdf.setTitle(data.title); pdf.setLanguage('da-DK'); pdf.setCreator('Vareven');
+    pdf.setTitle(data.title); pdf.setLanguage('da-DK'); pdf.setCreator('Varevennen');
     const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const form = pdf.getForm();
     let page, y;
@@ -27,7 +27,7 @@
     };
     const need = (h) => { if (y - h < pad + 14) { footer(); newPage(); } };
     let pageNo = 0;
-    const footer = () => { pageNo++; page.drawText(`Vareven, ${data.week}`, { x: pad, y: pad - 4, size: 7, font: reg, color: soft }); page.drawText(`Side ${pageNo}`, { x: W - pad - 30, y: pad - 4, size: 7, font: reg, color: soft }); };
+    const footer = () => { pageNo++; page.drawText(`Varevennen, ${data.week}`, { x: pad, y: pad - 4, size: 7, font: reg, color: soft }); page.drawText(`Side ${pageNo}`, { x: W - pad - 30, y: pad - 4, size: 7, font: reg, color: soft }); };
     const box = (x, yy, s, p) => {
       const o = { x, y: yy, width: s, height: s, borderColor: p === 4 ? soft : ink, borderWidth: p === 1 ? 2 : 1.2 };
       if (p === 3) o.borderDashArray = [2.5, 2]; if (p === 4) o.borderDashArray = [0.8, 1.6];

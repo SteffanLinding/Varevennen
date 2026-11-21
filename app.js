@@ -1000,7 +1000,7 @@
     const h1 = main.querySelector('h1');
     if (focusNext && h1) h1.focus({ preventScroll: true });
     focusNext = true;
-    document.title = `${title}, Vareven`;
+    document.title = `${title}, Varevennen`;
     document.querySelectorAll('[data-tab]').forEach((a) => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   }
 

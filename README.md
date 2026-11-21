@@ -1,4 +1,4 @@
-# Vareven
+# Varevennen
 
 Indkøbslisten, hvor hver vare har et varekort med prio 1 til 3, så den, der handler, kommer hjem med præcis den variant, husstanden plejer at købe.
 

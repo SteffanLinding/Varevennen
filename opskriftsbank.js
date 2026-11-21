@@ -1,4 +1,4 @@
-// Recipe bank: ordinary everyday recipes, written for Vareven (not copied from any site or book).
+// Recipe bank: ordinary everyday recipes, written for Varevennen (not copied from any site or book).
 // Amounts are for 4 people. "Fra skabet" (salt, pepper, oil) is not listed.
 // A recipe the household takes from here is copied into their own cookbook, where they can change it.
 window.OPSKRIFTSBANK = {
