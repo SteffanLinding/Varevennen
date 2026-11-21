@@ -15,7 +15,7 @@
   const blankWeek = () => ({ dishes: [], extra: {}, qty: {}, skip: {}, ticks: {}, cardOv: {} });
   const blank = () => ({
     v: 3,
-    weeks: { [CUR_WEEK]: { ...blankWeek(), dishes: S.start.slice(), ticks: { 'Mælk': 1, 'Løg': 1, 'Ris': 1, 'Smør': 1, 'Kylling': 2, 'Karry': 4 } } },
+    weeks: { [CUR_WEEK]: { ...blankWeek(), dishes: S.start.slice(), ticks: {} } },
     cards: {
       'Hakket svinekød': { p1: S.kort['Hakket svinekød'].p1, p2: S.kort['Hakket svinekød'].p2, p3: S.kort['Hakket svinekød'].p3, rule: 'spoerg_foerst', max: S.kort['Hakket svinekød'].maks_pris, store: S.kort['Hakket svinekød'].butik, note: S.kort['Hakket svinekød'].note },
       'Mælk': { p1: 'Arla letmælk 1,5 %, 1 L', ean1: '5700426101217', p2: '', p3: '', rule: 'naermeste', max: '', store: '', note: '' }
@@ -572,7 +572,7 @@
     const names = Object.keys(S.retter).filter((d) => !em || emneOf(d) === em).sort((a, b) => (chapters.indexOf(emneOf(a)) - chapters.indexOf(emneOf(b))) || (S.start.includes(b) - S.start.includes(a)) || a.localeCompare(b, 'da'));
     const bookNav = `<nav class="chips chips--scroll booknav" aria-label="Kapitler i opskriftsbogen"><a class="chip" data-replace href="#/retter" ${!em ? 'aria-current="true"' : ''}>Alle <small>${Object.keys(S.retter).length}</small></a>${chapters.map((e) => `<a class="chip" data-replace href="#/retter?emne=${slug(e)}" ${em === e ? 'aria-current="true"' : ''}>${esc(e)} <small>${Object.keys(S.retter).filter((d) => emneOf(d) === e).length}</small></a>`).join('')}</nav>`;
     return `${segNav('uge')}<div class="screen-head"><h1 tabindex="-1">Hvad skal vi spise i ${weekLabel()}?</h1>${weekNav()}<p class="lead">Sæt flueben ved ugens retter. Tryk på en ret for at se opskriften og vælge, hvad der skal købes.</p><p class="retter__links"><a class="howto" href="#/kogebog">${icon.search}Find flere retter</a><a class="howto" href="#/ny-opskrift">${icon.plus}Skriv jeres egen</a><a class="howto" href="#/teknikker">${icon.play}Sådan gør du</a></p></div>
-      ${bookNav}<fieldset><legend class="visually-hidden">Retter</legend><ul class="dishes">${names.map((d, i) => (i === 0 || emneOf(names[i - 1]) !== emneOf(d) ? `<li class="chapter" role="presentation"><h2>${esc(emneOf(d))}</h2></li>` : '') + `<li><input type="checkbox" id="d${i}" data-dish="${esc(d)}" ${sel.has(d) ? 'checked' : ''} aria-label="Vælg ${esc(d)} til ${weekLabel()}"><label for="d${i}" class="dish__tick"><span class="box" aria-hidden="true">${icon.check}</span></label><a class="dish__open" href="#/ret/${slug(d)}">${dishImg(d) ? `<img class="dish__img" src="${esc(dishImg(d))}" alt="" width="500" height="375" loading="lazy">` : '<span class="dish__img dish__img--none" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(d)}</span><span class="row__want">${pl(needOf(d).length, 'vare', 'varer')}${needOf(d).length < S.retter[d].length ? ` (${S.retter[d].length - needOf(d).length} har I)` : ''}${S.start.includes(d) ? ', startret' : ''}${db.dishFoto && db.dishFoto[d] ? ', eget foto' : ''}</span></span></a><label class="iconbtn dish__cam" title="Eget foto">${icon.camera}<input type="file" accept="image/*" class="visually-hidden" data-photo="dish" data-key="${esc(d)}" data-n="0" aria-label="Eget foto af ${esc(d)}"></label></li>`).join('')}</ul></fieldset>
+      ${bookNav}<fieldset><legend class="visually-hidden">Retter</legend><ul class="dishes">${names.map((d, i) => (i === 0 || emneOf(names[i - 1]) !== emneOf(d) ? `<li class="chapter"><h2>${esc(emneOf(d))}</h2></li>` : '') + `<li><input type="checkbox" id="d${i}" data-dish="${esc(d)}" ${sel.has(d) ? 'checked' : ''} aria-label="Vælg ${esc(d)} til ${weekLabel()}"><label for="d${i}" class="dish__tick"><span class="box" aria-hidden="true">${icon.check}</span></label><a class="dish__open" href="#/ret/${slug(d)}">${dishImg(d) ? `<img class="dish__img" src="${esc(dishImg(d))}" alt="" width="500" height="375" loading="lazy">` : '<span class="dish__img dish__img--none" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(d)}</span><span class="row__want">${pl(needOf(d).length, 'vare', 'varer')}${needOf(d).length < S.retter[d].length ? ` (${S.retter[d].length - needOf(d).length} har I)` : ''}${S.start.includes(d) ? ', startret' : ''}${db.dishFoto && db.dishFoto[d] ? ', eget foto' : ''}</span></span></a><label class="iconbtn dish__cam" title="Eget foto">${icon.camera}<input type="file" accept="image/*" class="visually-hidden" data-photo="dish" data-key="${esc(d)}" data-n="0" aria-label="Eget foto af ${esc(d)}"></label></li>`).join('')}</ul></fieldset>
       ${Object.keys(RB).length ? `<details class="credits"><summary>Fotokreditering</summary><ul>${names.filter((d) => RB[d] && !(db.dishFoto && db.dishFoto[d])).map((d) => `<li>${esc(d)}: ${esc(RB[d].credit)}</li>`).join('')}</ul></details>` : ''}
       <div class="dock"><div class="dock__in"><button class="btn btn--primary" type="button" id="build" ${sel.size ? '' : 'disabled'}>Byg listen, ${pl(n, 'vare', 'varer')}</button></div></div>`;
   }
@@ -584,7 +584,7 @@
     let vs = S.varer.map((v) => v.navn);
     if (f === 'mangler') vs = vs.filter((v) => !filled(v));
     if (f === 'start') vs = vs.filter((v) => startItems.has(v));
-    const chips = [['alle', 'Alle'], ['mangler', 'Mangler kort'], ['start', 'Startpakke'], ['tilbud', 'På tilbud nu']];
+    const chips = [['alle', 'Alle'], ['mangler', 'Mangler kort'], ['start', 'Startpakke']];
     const head = `<div class="screen-head"><h1 tabindex="-1">Katalog, ${S.varer.length} varer</h1><p class="lead">${S.varer.filter((v) => filled(v.navn)).length} har et udfyldt kort. ${listItems().length} står på listen. Tryk Tilføj for at lægge en enkelt vare på listen.</p></div>
       <div class="field search"><label for="find">Søg i varerne</label><input class="input" type="search" id="find" name="q" value="${esc(term)}" placeholder="fx mælk eller fedt%" autocomplete="off" enterkeyhint="search" aria-describedby="find-help"><p class="help" id="find-help" aria-live="polite"></p></div>
       <div class="chips" role="group" aria-label="Filter" style="margin-bottom: var(--space-lg)">${chips.map(([k, l]) => `<a class="chip" href="#/katalog?f=${k}${term ? '&q=' + encodeURIComponent(term) : ''}" data-replace ${f === k ? 'aria-current="true"' : ''}>${l}</a>`).join('')}</div>`;
@@ -656,12 +656,12 @@
   function spoerg(v) {
     const c = card(v) || {};
     const text = c.p1 ? `${c.store || 'Butikken'} har ingen af de tre: ${[c.p1, c.p2, c.p3].filter(Boolean).join(', ')}. Hvad gør jeg?` : `Hvilken ${lower1(v)} skal jeg tage? ${askOf[v] || ''}`.trim();
-    return `${back('#/kort/' + slug(v), v)}<div class="screen-head"><h1 tabindex="-1">Spørg hjemme</h1><p class="lead">${c.p1 ? 'Kortet siger: spørg først. ' : ''}Den anden får beskeden og svarer med ét tryk.</p></div>
-      <form class="form" data-endpoint="" id="askform" novalidate>
+    return `${back('#/kort/' + slug(v), v)}<div class="screen-head"><h1 tabindex="-1">Spørg hjemme</h1><p class="lead">${c.p1 ? 'Kortet siger: spørg først. ' : ''}Send beskeden som sms eller i jeres beskedapp.</p></div>
+      <form class="form" id="askform" novalidate>
         <div class="field"><label for="msg">Besked</label><textarea class="input" id="msg" name="msg" maxlength="300">${esc(text)}</textarea><p class="help">Du kan rette teksten, før du sender.</p></div>
-        <div><button class="btn btn--primary btn--wide" type="submit">Send til den anden</button><p class="help" id="ask-help" aria-live="polite"></p></div>
+        <div><button class="btn btn--primary btn--wide" type="submit">Send beskeden</button><p class="help" id="ask-help" aria-live="polite"></p></div>
       </form>
-      <p class="section"><a class="link link--block" href="#/svar/${slug(v)}">Se hvordan det ser ud hos den anden</a></p>`;
+`;
   }
 
   function svar(v) {
@@ -766,6 +766,10 @@
       <section class="section" id="p-butik" aria-labelledby="pb"><h2 id="pb">Butik</h2>
         <div class="field"><label for="pshop">Jeres foretrukne butik</label><select class="input" id="pshop" data-shop>${['', ...CHAINS].map((c) => `<option value="${esc(c)}" ${db.shop === c ? 'selected' : ''}>${c || 'Ingen bestemt'}</option>`).join('')}</select></div>
         <p class="meta">Produkter, der er set i butikken, står først i forslagene, og på listen ser I, hvilken prio butikken har.</p></section>
+      <section class="section" id="p-data" aria-labelledby="pd"><h2 id="pd">Jeres data</h2>
+        <p class="meta">Alt ligger kun på denne telefon. Tag en kopi, så I ikke mister varekort, lister og opskrifter, eller send kopien til den anden telefon og hent den ind der.</p>
+        <div class="actions"><button class="btn btn--quiet" type="button" data-export>Gem en kopi</button><label class="btn btn--quiet">Hent en kopi ind<input type="file" accept="application/json,.json" class="visually-hidden" data-import></label></div>
+        <p class="help" id="data-help" aria-live="polite"></p></section>
       <section class="section" id="p-varer" aria-labelledby="pv"><h2 id="pv">Jeres varer</h2>
         <p class="meta">Prio 1 for hver vare. Tryk på en vare for at ændre kortet, eller træk rundt i <a class="link" href="#/mine">Mine varer</a>.</p>
         <ul class="pvarer">${S.varer.map(({ navn: v }) => { const c = stdCard(v) || {}; const im = imgOf(c, 1); const al = prodAllergy(prodOf(c, 1)); return `<li><a class="pvare" href="#/kort/${slug(v)}/rediger">${im && im.billede ? `<img class="row__img" src="${esc(im.billede)}" alt="" width="400" height="400" loading="lazy">` : '<span class="row__img row__img--blank" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(v)}${c.auto ? ' <span class="badge">Forslag</span>' : ''}</span><span class="row__want">${blockOf(v) ? esc(blockOf(v)) : c.p1 ? nb(c.p1) : 'Intet valgt'}${al.length ? `. <b>Indeholder ${esc(al.map(lower1).join(' og '))}</b>` : ''}</span></span>${icon.fwd}</a></li>`; }).join('')}</ul></section>`;
@@ -1134,6 +1138,13 @@
     if (e.target.matches('[data-emne]')) { (db.emne ||= {})[e.target.dataset.emne] = e.target.value; save(); toast(`Flyttet til ${e.target.value}.`); return; }
     if (e.target.matches('[data-listshop]')) { db.lister[e.target.dataset.listshop].butik = e.target.value; save(); toast(e.target.value ? `Listen er til ${e.target.value}.` : 'Listen er ikke bundet til en butik.'); return; }
     if (e.target.matches('#rf') && e.target.files && e.target.files[0]) { shrink(e.target.files[0]).then((d) => { pendingPhoto = d; const pv = document.getElementById('rf-prev'); if (pv) { pv.innerHTML = `<img src="${d}" alt="Det valgte billede" width="500" height="375">`; pv.hidden = false; } }).catch((er) => alertLine(er.message)); return; }
+    if (e.target.matches('[data-import]') && e.target.files && e.target.files[0]) {
+      const h = document.getElementById('data-help');
+      e.target.files[0].text().then((t) => { const d = JSON.parse(t); if (!d || !d.weeks || !d.cards) throw new Error('bad');
+        if (!confirm('Erstat alt på denne telefon med kopien?')) return; localStorage.setItem(KEY, JSON.stringify(d)); location.reload(); })
+        .catch(() => { h.textContent = 'Filen kunne ikke læses. Vælg en kopi, der er gemt fra Varevennen.'; });
+      return;
+    }
     if (e.target.matches('[data-withwant]')) { const t = document.getElementById('sharetext'); if (t) t.textContent = shareText(weekData(), e.target.checked); return; }
     if (e.target.matches('[data-shop]')) { db.shop = e.target.value; save(); rerender(); document.getElementById('shop')?.focus(); return; }
     if (e.target.matches('[data-unknown]')) { location.replace(e.target.dataset.unknown); }
@@ -1183,6 +1194,13 @@
       h.textContent = `${pl(r.ing.length, 'ingrediens', 'ingredienser')} og ${pl(r.steps.length, 'trin', 'trin')}. Tjek felterne herunder, før du gemmer.`; f.rn.focus(); return; }
     const rr = e.target.closest('[data-resetrecipe]');
     if (rr) { const d = rr.dataset.resetrecipe; if (!confirm(`Brug den oprindelige opskrift for ${d}? Jeres ændringer forsvinder.`)) return; delete db.opskrifter[d]; OP[d] = OPBASE[d]; S.retter[d] = RETBASE[d]; save(); location.hash = `#/ret/${slug(d)}`; return; }
+    if (e.target.closest('[data-export]')) {
+      const name = `varevennen-kopi-${new Date().toISOString().slice(0, 10)}.json`; const file = new File([JSON.stringify(db)], name, { type: 'application/json' });
+      const h = document.getElementById('data-help');
+      if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: 'Varevennen, kopi' }).then(() => { h.textContent = 'Kopien er sendt.'; }).catch(() => {});
+      else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); a.remove(); h.textContent = `Kopien er gemt som ${name}.`; }
+      return;
+    }
     const dic = e.target.closest('[data-dictate]');
     if (dic) { dictate(dic); return; }
     const shareHelp = (t) => { const h = document.getElementById('share-help'); if (h) h.textContent = t; };
@@ -1364,6 +1382,12 @@
       const ok = save(); render(); const h = document.getElementById('price-help'); if (h) h.textContent = ok ? `Gemt på telefonen: ${n.toFixed(2).replace('.', ',')} kr.` : 'Kunne ikke gemme.';
       return;
     }
+    if (form.id === 'askform') {
+      const text = form.msg.value.trim(); const help = document.getElementById('ask-help'); if (!text) { help.textContent = 'Skriv en besked først.'; form.msg.focus(); return; }
+      if (navigator.share) navigator.share({ text }).then(() => { help.textContent = 'Sendt.'; }).catch((err) => { if (err.name !== 'AbortError') location.href = `sms:?&body=${encodeURIComponent(text)}`; });
+      else location.href = `sms:?&body=${encodeURIComponent(text)}`;
+      return;
+    }
     if (form.dataset.endpoint === '') {
       const help = form.querySelector('[aria-live]');
       help.textContent = 'Ikke sendt: beskeder til den anden er ikke koblet på endnu.';
@@ -1408,7 +1432,13 @@
   mergeOwn(); relabel(); autofill(); save();
   // offline and installable: only where the page is served over https (or localhost) from its own origin
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then((reg) => {
+      const offer = (w) => { if (!w || !navigator.serviceWorker.controller) return; toast('Der er en ny version af appen.'); const el = document.getElementById('toast'); el.insertAdjacentHTML('beforeend', '<button type="button" class="toast__undo" data-reload>Opdater</button>'); clearTimeout(el._t); };
+      if (reg.waiting) offer(reg.waiting);
+      reg.addEventListener('updatefound', () => { const w = reg.installing; w && w.addEventListener('statechange', () => { if (w.state === 'installed') offer(w); }); });
+      setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+    }).catch(() => {}));
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-reload]')) location.reload(); });
   }
   render();
 })();

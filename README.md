@@ -9,7 +9,7 @@ Appen er statiske filer, der kører i browseren. Lister, varekort, fotos og egne
 ## Kilder og licenser
 - Produktdata og -billeder: Open Food Facts, Open Database License. Billeder CC BY-SA.
 - Priser: Open Prices (prices.openfoodfacts.org), Open Database License.
-- Rettebilleder, illustrationer og videoer: Wikimedia Commons, krediteret i appen ved hvert billede og hver video.
+- Rettebilleder, illustrationer og videoer: Wikimedia Commons og Openverse (Flickr), frie licenser (CC0, CC BY, CC BY-SA), krediteret i appen ved hvert billede og hver video.
 - Stregkodelæser: @zxing/library 0.21.3 (zxing.min.js), se zxing-LICENSE.txt.
 - PDF: pdf-lib 1.17.1, MIT.
 - Skrift: Archivo, SIL Open Font License (fonts/OFL.txt).

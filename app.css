@@ -764,3 +764,9 @@ label.btn:has(input:focus-visible) { outline: 2px solid var(--color-focus); outl
 /* Katalog rows on a surface, like the other lists */
 .group .cat { border-top: 0; background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding-inline: var(--space-xs); }
 .group .cat li:last-child { border-bottom: 0; }
+/* narrow phones (320 px): week picker and add field must fit on one line */
+.weeknav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; flex-wrap: nowrap; }
+.weeknav__lbl { min-width: 0; }
+.weeknav__lbl .meta { overflow-wrap: anywhere; }
+.composer__field { min-width: 0; }
+@media (max-width: 22em) { .composer__row { gap: var(--space-2xs); } .composer .iconbtn--round { width: 44px; height: 44px; } }
