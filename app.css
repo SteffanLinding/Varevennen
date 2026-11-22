@@ -825,7 +825,17 @@ label.btn:has(input:focus-visible) { outline: 2px solid var(--color-focus); outl
 .group .row__open:not(:has(img.row__img)):has(.row__price) { grid-template-columns: minmax(0, 1fr); }
 .group .row__price { grid-column: -2; justify-self: start; font-size: var(--text-sm); }
 /* help and profile sit together in the top bar */
-.topbar .profbtn + .profbtn { margin-left: calc(var(--space-xs) - var(--space-lg)); }
+/* the two icon pairs (help + profile in the top bar, list + share beside the title) share one grid:
+   same 44 px boxes, same 4 px gap, same right edge, so each icon sits straight above the one below */
+.profbtn, .iconbtn--plain { width: 44px; height: 44px; min-width: 44px; padding: 0; gap: 0; justify-content: center; }
+.profbtn svg, .iconbtn--plain svg { width: 24px; height: 24px; }
+.topbar__in { gap: var(--space-2xs); }
+.topbar .profbtn + .profbtn { margin-left: 0; }
+@media (min-width: 48em) {
+  .profbtn { width: auto; padding: 0 var(--space-sm); gap: var(--space-2xs); }
+  .topbar__in { gap: var(--space-lg); }
+  .topbar .profbtn + .profbtn { margin-left: calc(var(--space-xs) - var(--space-lg)); }
+}
 .qtybar button:disabled { opacity: 0.4; cursor: not-allowed; }
 .intro__in.from-right { animation: from-right var(--dur-short) var(--ease-out); }
 .intro__in.from-left { animation: from-left var(--dur-short) var(--ease-out); }
