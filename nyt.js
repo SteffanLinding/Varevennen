@@ -3,7 +3,7 @@
 window.NYT = [
   { id: '2026-11-22c', dato: '22. nov.', titel: 'Bedre stregkodelæser',
     punkter: [
-      { h: 'Læser flere koder', p: 'Scanneren er gjort hurtigere og bedre til at læse små, uskarpe og skæve stregkoder.' },
+      { h: 'Læser flere koder', p: 'Scanneren er gjort hurtigere og bedre til at læse små, mørke, uskarpe og skæve stregkoder, uanset hvor i billedet de står.' },
       { h: 'Billede af stregkoden', p: 'Kan kameraet ikke læse den live, så tag et billede af koden i stedet. Der er også en lommelygte-knap, hvis telefonen har en.', href: '#/scan' },
       { h: 'Ukendte varer', p: 'Kender appen ikke varen, slår den den op og lader jer gemme den som prio 1, 2 eller 3 på det rigtige varekort.' }
     ] },

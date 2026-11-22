@@ -54,21 +54,30 @@
     const tot = w * h; let lo = 0, hi = 255, acc = 0; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc > tot * 0.02) { lo = v; break; } } acc = 0; for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc > tot * 0.02) { hi = v; break; } }
     const span = Math.max(40, hi - lo); const grey = new Uint8ClampedArray(w * h);
     for (let i = 0, j = 0; i < d.length; i += 4, j++) grey[j] = ((((d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8) - lo) * 255) / span;
+    if (sharp >= 3) { // soft focus / motion blur along the line: sharpen across the bars only
+      const r = sharp === 3 ? 3 : 6, amt = sharp === 3 ? 2.5 : 4; const o2 = new Uint8ClampedArray(w * h);
+      for (let y = 0; y < h; y++) { const row = y * w; let sum = 0; for (let x = 0; x < r; x++) sum += grey[row + x]; for (let x = 0; x < w; x++) { const a = x + r, b = x - r - 1; if (a < w) sum += grey[row + a]; if (b >= 0) sum -= grey[row + b]; const n = Math.min(w - 1, x + r) - Math.max(0, x - r) + 1; o2[row + x] = grey[row + x] + amt * (grey[row + x] - sum / n); } }
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) { d[i] = d[i + 1] = d[i + 2] = o2[j]; } g.putImageData(im, 0, 0); return cv;
+    }
     const out = sharp ? new Uint8ClampedArray(w * h) : grey;
     if (sharp) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const o = y * w + x; out[o] = 5 * grey[o] - grey[o - 1] - grey[o + 1] - grey[o - w] - grey[o + w]; }
     for (let i = 0, j = 0; i < d.length; i += 4, j++) { d[i] = d[i + 1] = d[i + 2] = out[j]; }
     g.putImageData(im, 0, 0); return cv;
   }
   // the attempts, in turn: whole frame, centre band, tight band enlarged, then the same with contrast/sharpening
+  // [x, y, w, h (fractions of the frame), draw width, enlarge, enhance 0-4]
+  // The code can be anywhere in the frame, so the whole frame is covered in bands (top, middle, bottom).
   const PLANS = [
-    [0, 0, 1, 1, 1280, 0, 0], [0, 0.25, 1, 0.5, 1600, 0, 0], [0.1, 0.35, 0.8, 0.3, 1800, 1, 0],
-    [0.25, 0.38, 0.5, 0.24, 1800, 1, 0], [0, 0.25, 1, 0.5, 1600, 0, 1], [0.1, 0.35, 0.8, 0.3, 1800, 1, 1],
-    [0.25, 0.38, 0.5, 0.24, 1800, 1, 2], [0.1, 0.3, 0.8, 0.4, 1800, 1, 2]
+    [0, 0, 1, 1, 1280, 0, 0], [0, 0.3, 1, 0.4, 1600, 0, 0], [0, 0.3, 1, 0.4, 1600, 0, 1],
+    [0, 0.55, 1, 0.4, 1600, 0, 0], [0, 0.55, 1, 0.4, 1600, 0, 1], [0, 0.05, 1, 0.4, 1600, 0, 0], [0, 0.05, 1, 0.4, 1600, 0, 1],
+    [0.1, 0.35, 0.8, 0.3, 1800, 1, 0], [0.25, 0.38, 0.5, 0.24, 1800, 1, 0], [0, 0.55, 1, 0.4, 2000, 1, 0], [0, 0.3, 1, 0.4, 2000, 1, 0], [0, 0.05, 1, 0.4, 2000, 1, 0], [0, 0.3, 1, 0.4, 1600, 0, 3], [0, 0.55, 1, 0.4, 1600, 0, 3], [0, 0.05, 1, 0.4, 1600, 0, 3],
+    [0, 0.3, 1, 0.4, 2000, 1, 4], [0, 0.55, 1, 0.4, 2000, 1, 4], [0, 0.05, 1, 0.4, 2000, 1, 4],
+    [0.25, 0.38, 0.5, 0.24, 1800, 1, 2], [0.25, 0.38, 0.5, 0.24, 1800, 1, 4]
   ];
   function decodeSource(src, sw, sh, attempt) {
     const [fx, fy, fw, fh, mw, up, enh] = PLANS[attempt % PLANS.length];
     const cv = drawFrame(src, sw * fx, sh * fy, sw * fw, sh * fh, mw, up);
-    if (enh) enhance(cv, enh === 2);
+    if (enh) enhance(cv, enh);
     return decodeCanvas(cv);
   }
 
@@ -78,7 +87,7 @@
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { onError(new Error('nocamera')); return; }
     try {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1440 }, advanced: [{ focusMode: 'continuous' }] }, audio: false });
       } catch (e) {
         if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) throw e;
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -106,7 +115,7 @@
     const tick = () => {
       if (stopped) return;
       if (video.readyState >= 2 && video.videoWidth) { try { const t = decodeSource(video, video.videoWidth, video.videoHeight, n++); if (t && done(t)) return; } catch (e) {} }
-      timer = setTimeout(tick, 60);
+      timer = setTimeout(tick, 20);
     };
     tick();
   }
@@ -120,7 +129,7 @@
     for (let i = 0; i < PLANS.length * 2; i++) {
       const [fx, fy, fw, fh, mw, up, enh] = PLANS[i % PLANS.length]; const big = i < PLANS.length;
       const cv = drawFrame(bmp, sw * fx, sh * fy, sw * fw, sh * fh, big ? Math.max(mw, 2000) : mw * 0.6, up);
-      if (enh) enhance(cv, enh === 2);
+      if (enh) enhance(cv, enh);
       let t = decodeCanvas(cv); if (valid(t)) return t.length === 12 ? '0' + t : t;
       t = decodeCanvas(rot(cv)); if (valid(t)) return t.length === 12 ? '0' + t : t; // sideways
     }

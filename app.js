@@ -831,7 +831,7 @@
         <div class="viewfinder" id="viewfinder"><video id="camvid" muted playsinline aria-hidden="true"></video><div class="viewfinder__frame"><p id="cam-msg">Starter kameraet…</p></div></div>
         <p class="lead">${target ? `Hold stregkoden på ${esc(lower1(target))} foran kameraet.` : 'Hold stregkoden foran kameraet. Appen finder selv varen på listen.'}</p>
         <p class="help" id="cam-help" aria-live="polite"></p>
-        <div class="scan__tools"><button class="btn btn--quiet btn--s" type="button" data-torch hidden aria-pressed="false">Tænd lommelygte</button><label class="btn btn--quiet btn--s photo-pick">${icon.camera}<span>Tag billede af stregkoden</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" id="eanfoto" aria-label="Tag billede af stregkoden"></label></div>
+        <div class="scan__tools"><button class="btn btn--quiet btn--s" type="button" data-torch hidden aria-pressed="false">Tænd lommelygte</button><label class="btn ${'BarcodeDetector' in window ? 'btn--quiet' : 'btn--primary'} btn--s photo-pick">${icon.camera}<span>Tag billede af stregkoden</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" id="eanfoto" aria-label="Tag billede af stregkoden"></label></div>
         ${manual}</div>`;
     }
     const r = scanVerdict(ean, target);
@@ -1077,7 +1077,7 @@
       if (msg) msg.textContent = 'Hold stregkoden her'; document.getElementById('viewfinder')?.classList.add('is-live');
       setTimeout(() => { const t = document.querySelector('[data-torch]'); if (t && Scanner.torchOk()) t.hidden = false; }, 600);
     }, { once: true });
-    clearTimeout(camHint); camHint = setTimeout(() => { const h = document.getElementById('cam-help'); if (h && location.hash.startsWith('#/scan') && !location.hash.includes('ean=')) h.textContent = 'Svært at læse? Hold varen 15-20 cm fra, med lys på stregerne og stregkoden vandret. Eller tag et billede af den, eller skriv tallene.'; }, 8000);
+    clearTimeout(camHint); camHint = setTimeout(() => { const h = document.getElementById('cam-help'); if (h && location.hash.startsWith('#/scan') && !location.hash.includes('ean=')) h.textContent = 'Svært at læse? Hold varen 15-20 cm fra, med lys på stregerne og stregkoden vandret. Eller tryk på Tag billede af stregkoden (virker næsten altid), eller skriv tallene.'; }, 6000);
   }
   let camHint = 0;
 
