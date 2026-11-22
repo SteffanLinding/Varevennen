@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Varevennen, alle skærme</title>
+<meta name="description" content="Gennemgang af alle skærme og tilstande i prototypen, med telefonen til venstre og skærmlisten til højre.">
+<style>
+/* Hallmark · shape: app screen · theme: custom (same tokens as the app) · review board for the prototype, app-design step 8 */
+@import url("./tokens.css");
+@import url("./base.css");
+@font-face { font-family: "Archivo"; font-style: normal; font-display: swap; font-weight: 100 900; font-stretch: 62% 125%; src: url("./fonts/archivo-wdth.woff2") format("woff2-variations"); }
+body { font-synthesis: none; }
+.board { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-xl); align-items: start; max-width: 72rem; margin-inline: auto; padding: var(--space-xl) var(--space-lg); }
+.phone { position: sticky; top: var(--space-lg); width: 390px; height: 844px; border: 1px solid var(--color-rule); border-radius: var(--radius-card); overflow: hidden; background: var(--color-paper); }
+.phone iframe { display: block; width: 390px; height: 844px; border: 0; }
+h1 { font-size: var(--text-3xl); font-weight: 800; font-stretch: 62%; line-height: 1.05; }
+.lead { margin-top: var(--space-xs); color: var(--color-ink-2); max-width: 55ch; }
+.tools { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin: var(--space-md) 0 var(--space-lg); }
+.btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-md); border: 1px solid var(--color-rule); border-radius: var(--radius-input); background: var(--color-paper); color: var(--color-ink); font: 600 var(--text-md)/1 var(--font-body); text-decoration: none; cursor: pointer; transition: background-color var(--dur-short) var(--ease-out); }
+.btn:active { background: var(--color-paper-3); }
+.btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .btn:hover { background: var(--color-paper-2); } .screens a:hover { background: var(--color-paper-2); } }
+h2 { margin: var(--space-lg) 0 var(--space-xs); font: 600 var(--text-sm)/1.3 var(--font-body); color: var(--color-ink-2); }
+.screens { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-rule); }
+.screens li { border-bottom: 1px solid var(--color-rule); }
+.screens a { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: var(--space-sm); align-items: baseline; min-height: 44px; padding: var(--space-xs) var(--space-xs); color: var(--color-ink); text-decoration: none; border-radius: var(--radius-input); transition: background-color var(--dur-short) var(--ease-out); }
+.screens a:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.screens a[aria-current="true"] { background: var(--color-accent-soft); }
+.screens .no { font-variant-numeric: tabular-nums; color: var(--color-ink-2); font-size: var(--text-sm); }
+.screens .job { display: block; font-size: var(--text-sm); color: var(--color-ink-2); }
+@media (max-width: 60rem) { .board { grid-template-columns: minmax(0, 1fr); } .phone { position: static; width: 100%; max-width: 390px; } .phone iframe { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .btn, .screens a { transition: none; } }
+</style>
+</head>
+<body>
+<main class="board">
+  <div class="phone"><iframe id="app" title="Appen" src="./index.html#/indkob"></iframe></div>
+  <div>
+    <h1>Alle skærme og tilstande</h1>
+    <p class="lead">Klik på en skærm for at åbne den i telefonen. Telefonen er den rigtige prototype, så alt kan trykkes på.</p>
+    <div class="tools"><button class="btn" type="button" id="restart">Start forfra</button><a class="btn" href="./index.html">Åbn appen alene</a></div>
+    <nav aria-label="Skærme" id="nav"></nav>
+  </div>
+</main>
+<script>
+(() => {
+  const S = [
+    ['Handle i butikken', [
+      ['S01', 'indkob', 'Indkøb', 'Se hvad der mangler, og hvad der er fundet'],
+      ['S02', 'kort/M%C3%A6lk', 'Varekort med produkt', 'Vise den rigtige variant med billede'],
+      ['S03', 'kort/Hakket%20svinek%C3%B8d', 'Varekort med husk og regel', 'Prio 1 til 4 og hvad man gør, hvis intet findes'],
+      ['S04', 'kort/Pasta', 'Varekort, ikke udfyldt', 'Hjælpe den handlende, når kortet mangler'],
+      ['S05', 'scan?r=1', 'Scan: prio 1', 'Bekræfte at varen er rigtig'],
+      ['S06', 'scan?r=2', 'Scan: prio 2', 'Godkende et alternativ'],
+      ['S07', 'scan?r=0', 'Scan: forkert vare', 'Stoppe et fejlkøb'],
+      ['S08', 'spoerg/Hakket%20svinek%C3%B8d', 'Spørg hjemme', 'Sende et spørgsmål fra butikken'],
+      ['S09', 'svar/Hakket%20svinek%C3%B8d', 'Svar hjemmefra', 'Svare med ét tryk'],
+    ]],
+    ['Planlægge', [
+      ['S10', 'retter', 'Retter', 'Vælge ugens retter'],
+      ['S11', 'katalog', 'Katalog', 'Finde en vare og se hvad der mangler kort'],
+      ['S12', 'kort/M%C3%A6lk/rediger', 'Ret kortet', 'Vælge produkter og rykke rundt på prio'],
+      ['S13', 'vaelg/M%C3%A6lk?prio=2', 'Vælg produkt', 'Filtrere på butik, type og mærke'],
+      ['S14', 'priser/Hakket%20svinek%C3%B8d', 'Priser', 'Se og skrive priser ind'],
+      ['S15', 'del', 'Del listen', 'Tekst til en besked, eller en PDF med antal'],
+      ['S16', 'mine', 'Mine varer', 'Standardrækkefølgen for alle varer, træk for at bytte'],
+      ['S17', 'mine?f=forslag', 'Forslag at se igennem', 'Kort udfyldt automatisk, som I skal godkende'],
+      ['S18', 'profil', 'Profil', 'Allergier, varer I aldrig køber, butik og jeres varer'],
+      ['S19', 'teknikker', 'Sådan gør du', 'Alle teknikker med små film'],
+      ['S20', 'teknik/hvid-sovs', 'En teknik', 'Film trin for trin, gratis video og jeres egen video'],
+      ['S21', 'lister', 'Faste lister', 'Lister I altid bruger, med butik'],
+      ['S23', 'overblik', 'Overblik', 'Listen samlet: antal, produkt, butik og pris'],
+      ['S24', 'retter?emne=Klassikere', 'Opskriftsbog', 'Retterne delt i kapitler'],
+      ['S25', 'find-opskrifter?kat=Airfryer', 'Find opskrifter', 'Opskriftsbank i kategorier, læg i kogebogen'],
+      ['S26', 'bank/Linsedahl%20med%20ris', 'Opskrift fra banken', 'Se opskriften, læg den i kogebogen eller på listen'],
+      ['S27', 'frisk?v=Kartofler', 'Er den frisk?', 'Sådan vælger du gode varer og lader dårlige ligge'],
+      ['S28', 'hjaelp', 'Hjælp', 'Søg på det, du vil gøre'],
+      ['S22', 'ny-opskrift', 'Ny opskrift', 'Egen opskrift, ingredienser kobles til varekortene'],
+    ]],
+    ['Svære tilstande', [
+      ['T01', 'indkob?state=empty', 'Tom liste', 'Ingen retter valgt'],
+      ['T02', 'indkob?state=loading', 'Indlæser', 'Listen hentes'],
+      ['T03', 'indkob?state=offline', 'Offline', 'Intet net i butikken'],
+      ['T04', 'katalog?f=tilbud', 'Ingen tilbud', 'Ingen priskilde koblet på'],
+      ['T05', 'vaelg/Karry?prio=1', 'Få produkter', 'Næsten ingen data for varen'],
+    ]],
+  ];
+  const nav = document.getElementById('nav'); const app = document.getElementById('app');
+  nav.innerHTML = S.map(([g, list]) => `<h2>${g}</h2><ul class="screens">${list.map(([no, r, name, job]) => `<li><a href="#${r}" data-r="${r}"><span class="no">${no}</span><span>${name}<span class="job">${job}</span></span></a></li>`).join('')}</ul>`).join('');
+  const mark = (r) => nav.querySelectorAll('a').forEach((a) => a.setAttribute('aria-current', String(a.dataset.r === r)));
+  nav.addEventListener('click', (e) => { const a = e.target.closest('a[data-r]'); if (!a) return; e.preventDefault(); app.contentWindow.location.hash = '#/' + a.dataset.r; mark(a.dataset.r); });
+  document.getElementById('restart').addEventListener('click', () => { try { app.contentWindow.localStorage.removeItem('drv-design-v1'); } catch (err) {} app.contentWindow.location.hash = '#/indkob'; app.contentWindow.location.reload(); mark('indkob'); });
+  mark('indkob');
+})();
+</script>
+</body>
+</html>

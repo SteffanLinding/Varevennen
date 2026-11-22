@@ -12,7 +12,7 @@
   const weekRange = (key) => { const m = weekStart(key); const s2 = new Date(m); s2.setUTCDate(m.getUTCDate() + 6); const f = (d) => d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', timeZone: 'UTC' }); return m.getUTCMonth() === s2.getUTCMonth() ? `${m.getUTCDate()}.\u2013${f(s2)}` : `${f(m)}\u2013${f(s2)}`; };
 
   // ---------- store ----------
-  const blankWeek = () => ({ dishes: [], extra: {}, qty: {}, skip: {}, ticks: {}, cardOv: {} });
+  const blankWeek = () => ({ dishes: [], extra: {}, qty: {}, skip: {}, ticks: {}, cardOv: {}, opt: {}, note: {} });
   const blank = () => ({
     v: 3,
     weeks: { [CUR_WEEK]: { ...blankWeek(), dishes: S.start.slice(), ticks: {} } },
@@ -416,18 +416,39 @@
     return { varer: out, maengder };
   }
 
+  // ---------- notes and "kan undværes" (filler) on the week's list ----------
+  const isOpt = (v) => !!(W().opt && W().opt[v]);
+  const noteOf = (v) => (W().note && W().note[v]) || '';
+  const extraOf = (v) => [isOpt(v) ? 'kan undværes' : '', noteOf(v)].filter(Boolean).join(', ');
+  const FR = window.FRISK || { varer: {}, kategorier: [], datoer: [], generel: {} };
+  const extraPanel = (v) => `<div class="rowextra no-print"><button type="button" class="chip" data-opt="${esc(v)}" aria-pressed="${isOpt(v)}">${isOpt(v) ? icon.check : ''}Kan undværes</button><label class="rowextra__note"><span class="visually-hidden">Note til ${esc(v)}</span><input class="input" type="text" maxlength="80" data-note="${esc(v)}" value="${esc(noteOf(v))}" placeholder="Note, fx kun hvis den er billig" enterkeyhint="done" autocomplete="off"></label>${FR.varer[v] ? `<a class="link rowextra__frisk" href="#/frisk?v=${slug(v)}">Er den frisk? Sådan vælger du</a>` : ''}</div>`;
+  const friskBlock = (v) => { const f = FR.varer[v]; if (!f) return ''; return `<section class="section frisk" aria-labelledby="fh"><h2 id="fh">Er den frisk?</h2>
+      <p class="frisk__h">Køb den, hvis</p><ul class="frisk__yes">${f.godt.map((x) => `<li>${icon.check}<span>${esc(x)}</span></li>`).join('')}</ul>
+      <p class="frisk__h">Lad den ligge, hvis</p><ul class="frisk__no">${f.undgaa.map((x) => `<li>${icon.cross}<span>${esc(x)}</span></li>`).join('')}</ul>
+      ${f.tip ? `<p class="meta">${esc(f.tip)}</p>` : ''}<p class="meta"><a class="link" href="#/frisk">Se alle varer og datoer på pakken</a></p></section>`; };
+  function frisk(q) {
+    const open = q.get('v'); const kats = FR.kategorier;
+    return `${back('#/indkob', 'Indkøb')}<div class="screen-head"><h1 tabindex="-1">Er den frisk?</h1><p class="lead">Sådan ser du forskel på en god vare og en, der skal blive liggende. Søg på en vare.</p></div>
+      <div class="field minesearch"><label class="visually-hidden" for="frq">Søg efter en vare</label><span class="composer__field">${icon.search}<input id="frq" type="search" placeholder="fx kartofler" autocomplete="off" data-frsearch></span></div>
+      <p class="meta" id="fr-none" hidden>Ingen vejledning for den vare endnu.</p>
+      <div id="frlist">${kats.map((k) => { const vs = Object.entries(FR.varer).filter(([, f]) => f.kat === k); return vs.length ? `<section class="group" data-kat="${esc(k)}"><h2>${esc(k)}</h2><ul class="help-list">${vs.map(([v, f]) => `<li data-q="${esc(norm(v + ' ' + f.godt.join(' ') + ' ' + f.undgaa.join(' ')))}"><details${open === v ? ' open' : ''}><summary>${esc(v)}</summary><p class="frisk__h">Køb den, hvis</p><ul class="frisk__yes">${f.godt.map((x) => `<li>${icon.check}<span>${esc(x)}</span></li>`).join('')}</ul><p class="frisk__h">Lad den ligge, hvis</p><ul class="frisk__no">${f.undgaa.map((x) => `<li>${icon.cross}<span>${esc(x)}</span></li>`).join('')}</ul>${f.tip ? `<p>${esc(f.tip)}</p>` : ''}</details></li>`).join('')}</ul></section>` : ''; }).join('')}</div>
+      <section class="section" aria-labelledby="dh"><h2 id="dh">Datoer på pakken</h2><ul class="help-list">${FR.datoer.map((d) => `<li><details><summary>${esc(d.h)}</summary><p>${esc(d.t)}</p></details></li>`).join('')}</ul></section>
+      <p class="meta section">Det er almindelige råd og ingen garanti. Er du i tvivl om en vare, så lad den ligge.</p>`;
+  }
+
   // ---------- screens ----------
   function indkob(q) {
     const items = listItems();
     const state = q.get('state');
     if (state === 'offline') setStatus('Offline, 3 ændringer venter', 'offline');
-    const done = items.filter((v) => W().ticks[v] >= 1 && W().ticks[v] <= 3).length;
-    const missing = items.filter((v) => W().ticks[v] === 4).length;
+    const req = items.filter((v) => !isOpt(v)); const nOpt = items.length - req.length;
+    const done = req.filter((v) => W().ticks[v] >= 1 && W().ticks[v] <= 3).length;
+    const missing = req.filter((v) => W().ticks[v] === 4).length;
     const shopSel = `<div class="field shop no-print"><label for="shop">Jeg handler i</label><select class="input" id="shop" data-shop>${['', ...CHAINS].map((c) => `<option value="${esc(c)}" ${db.shop === c ? 'selected' : ''}>${c || 'Alle butikker'}</option>`).join('')}</select></div>`;
     const titleRow = `<div class="titlerow"><h1 tabindex="-1">Indkøb</h1><span class="titlerow__act no-print"><a class="iconbtn iconbtn--plain" href="#/overblik" aria-label="Overblik med pris og butik">${icon.list}</a><a class="iconbtn iconbtn--plain" href="#/del" aria-label="Del listen">${icon.share}</a></span></div>`;
     const head = `<div class="screen-head">${titleRow}${weekNav()}</div>
-      <section class="summary" aria-label="Status for ${weekLabel()}"><p class="progress"><b>${done}</b><span class="meta">af ${pl(items.length, 'vare', 'varer')} fundet${missing ? `, ${missing} ikke fundet` : ''}</span></p>
-      <div class="bar" role="progressbar" aria-label="Fundet" aria-valuemin="0" aria-valuemax="${items.length}" aria-valuenow="${done}" aria-valuetext="${done} af ${items.length} fundet"><span style="--p:${items.length ? done / items.length : 0}"></span></div>${items.length && priceSum(items).n ? `<p class="total"><span class="num">${sumLine(priceSum(items))}</span> <a class="link total__link" href="#/del?vis=priser">Hvor priserne kommer fra</a></p>` : ''}${shopSel}<p class="summary__more no-print"><a class="btn btn--quiet btn--s" href="#/overblik">${icon.list}<span>Overblik med pris og butik</span></a><a class="btn btn--quiet btn--s" href="#/lister">Faste lister</a></p></section>`;
+      <section class="summary" aria-label="Status for ${weekLabel()}"><p class="progress"><b>${done}</b><span class="meta">af ${pl(req.length, 'vare', 'varer')} fundet${missing ? `, ${missing} ikke fundet` : ''}${nOpt ? `, ${nOpt} kan undværes` : ''}</span></p>
+      <div class="bar" role="progressbar" aria-label="Fundet" aria-valuemin="0" aria-valuemax="${req.length}" aria-valuenow="${done}" aria-valuetext="${done} af ${req.length} fundet"><span style="--p:${req.length ? done / req.length : 0}"></span></div>${items.length && priceSum(items).n ? `<p class="total"><span class="num">${sumLine(priceSum(items))}</span> <a class="link total__link" href="#/del?vis=priser">Hvor priserne kommer fra</a></p>` : ''}${shopSel}<p class="summary__more no-print"><a class="btn btn--quiet btn--s" href="#/overblik">${icon.list}<span>Overblik med pris og butik</span></a><a class="btn btn--quiet btn--s" href="#/lister">Faste lister</a><a class="btn btn--quiet btn--s" href="#/frisk">Er den frisk?</a></p></section>`;
     if (state === 'loading') return head.replace(/<b>\d+<\/b>/, '<b>0</b>').replace(/--p:[\d.]+/, '--p:0') + `<div aria-busy="true" aria-label="Henter listen">${'<span class="skel"><i></i><i></i></span>'.repeat(6)}</div>`;
     if (state === 'empty' || !items.length) return `<div class="screen-head">${titleRow}${weekNav()}</div><div class="empty"><h2>Listen er tom${db.week !== CUR_WEEK ? ` for ${weekLabel()}` : ''}</h2><p class="lead">Vælg ugens retter, så bygger listen sig selv. Eller skriv en vare i feltet nederst.</p><div class="actions"><a class="btn btn--primary" href="#/retter">Vælg retter</a>${Object.keys(db.lister || {}).slice(0, 3).map((n) => `<button class="btn btn--quiet" type="button" data-loadlist="${esc(n)}">Brug ${esc(n)}</button>`).join('')}${Object.keys(db.lister || {}).length ? '' : '<a class="btn btn--quiet" href="#/lister">Lav en fast liste</a>'}</div></div>${composer()}`;
     const undoLine = undo ? `<p class="undo" role="status">${esc(undo.v)}: markering fjernet. <button class="link" type="button" data-undo>Fortryd</button></p>` : '';
@@ -437,7 +458,7 @@
     if (byRoute) { const r = routeOf(); const known = items.filter((v) => r[v]).sort((a, b) => r[a].p - r[b].p); const rest = items.filter((v) => !r[v]); groups = { [`Sådan går I i ${db.shop}`]: known }; if (rest.length) groups['Ikke placeret endnu'] = rest; }
     else items.forEach((v) => (groups[catOf[v]] ||= []).push(v));
     const routeNote = db.shop ? `<p class="meta routenote no-print">${byRoute ? `Sorteret efter jeres vej gennem ${esc(db.shop)}. <a class="link" data-replace href="#/indkob?kategori=1">Sortér efter kategori</a>` : routeReady() ? `<a class="link" data-replace href="#/indkob">Sortér efter jeres vej gennem ${esc(db.shop)}</a>` : `Sæt flueben i den rækkefølge, du finder varerne, så lærer appen jeres vej gennem ${esc(db.shop)}.`}</p>` : '';
-    const rows = routeNote + Object.entries(groups).map(([cat, vs]) => `<section class="group"><h2>${esc(cat)}</h2><ul class="rows">${vs.map((v) => {
+    const rows = routeNote + Object.entries(groups).map(([cat, vs]) => `<section class="group"><h2>${esc(cat)}</h2><ul class="rows">${vs.slice().sort((a, b) => isOpt(a) - isOpt(b)).map((v) => {
       const t = W().ticks[v] || 0; const c = card(v);
       const hasCard = !!(c && c.p1);
       let best = 1;
@@ -450,11 +471,11 @@
       const ghost = best;
       const label = t ? `${esc(v)}, registreret: ${hasCard ? FOUND[t] : (t === 4 ? 'ikke fundet' : 'fundet')}. Tryk for at fjerne markeringen.` : `${esc(v)}, ikke markeret. Tryk når ${hasCard ? `prio ${best} er` : 'den er'} i kurven.`;
       const q = qtyOf(v); const open = qtyOpen === v; const fromD = fromDishes().has(v);
-      return `<li class="row${open ? ' is-qty' : ''}"${t ? ' data-done' : ''}>
+      return `<li class="row${open ? ' is-qty' : ''}${isOpt(v) ? ' is-opt' : ''}"${t ? ' data-done' : ''}>
         <button class="row__tick no-print" type="button" data-tick="${esc(v)}" data-p="${best}" aria-label="${label}">${shown === 'want' ? `<span class="mark" data-p="want" aria-hidden="true">${ghost}</span>` : mark(shown)}</button>
-        <a class="row__open" draggable="false" href="#/kort/${slug(v)}" data-swipe="${esc(v)}" data-prios="${prios.join(',')}"${prios.length > 1 ? ` aria-describedby="swipe-help"` : ''}>${hasCard ? thumb(imgOf(c, best), 'row__img') : itemImg(v, true) ? `<img class="row__img" src="${esc(itemImg(v, true).src)}" alt="" width="400" height="400" loading="lazy">` : ''}<span class="row__txt"><span class="row__name">${esc(v)}${qtyOf(v) > 1 ? `<span class="qty"> × ${qtyOf(v)}</span>` : ''}</span>${want}${!fromDishes().has(v) ? '<span class="row__want">Ekstra vare</span>' : ''}</span>${priceOf(v) ? `<span class="row__price num" title="${esc(priceOf(v).label)}">${priceOf(v).kind === 'ca' ? 'ca. ' : ''}${kr(priceOf(v).n * qtyOf(v))}</span>` : ''}</a>
+        <a class="row__open" draggable="false" href="#/kort/${slug(v)}" data-swipe="${esc(v)}" data-prios="${prios.join(',')}"${prios.length > 1 ? ` aria-describedby="swipe-help"` : ''}>${hasCard ? thumb(imgOf(c, best), 'row__img') : itemImg(v, true) ? `<img class="row__img" src="${esc(itemImg(v, true).src)}" alt="" width="400" height="400" loading="lazy">` : ''}<span class="row__txt"><span class="row__name">${esc(v)}${qtyOf(v) > 1 ? `<span class="qty"> × ${qtyOf(v)}</span>` : ''}</span>${want}${!fromDishes().has(v) ? '<span class="row__want">Ekstra vare</span>' : ''}${isOpt(v) ? '<span class="badge badge--opt">Kan undværes</span>' : ''}${noteOf(v) ? `<span class="row__note">${esc(noteOf(v))}</span>` : ''}</span>${priceOf(v) ? `<span class="row__price num" title="${esc(priceOf(v).label)}">${priceOf(v).kind === 'ca' ? 'ca. ' : ''}${kr(priceOf(v).n * qtyOf(v))}</span>` : ''}</a>
         <button class="row__qty no-print" type="button" data-qtyopen="${esc(v)}" aria-expanded="${open}" aria-label="Antal ${esc(v)}: ${q}. Tryk for at ændre">${q > 1 ? `× ${q}` : q}</button>
-        ${open ? `<div class="qtybar no-print" role="group" aria-label="Vælg antal ${esc(v)}"><button type="button" data-setqty="${q - 1}" data-vare="${esc(v)}" aria-label="Én mindre, ${q - 1}" ${q <= 1 && fromD ? 'disabled' : ''}>${icon.minus}</button>${[...(fromD ? [] : [0]), 1, 2, 3, 4].map((n) => `<button type="button" data-setqty="${n}" data-vare="${esc(v)}" aria-pressed="${n === q}">${n === 0 ? 'Fjern' : n}</button>`).join('')}<button type="button" data-setqty="${q + 1}" data-vare="${esc(v)}" aria-label="Én mere, ${q + 1}">${icon.plus}</button></div>` : ''}
+        ${open ? `<div class="qtybar no-print" role="group" aria-label="Vælg antal ${esc(v)}"><button type="button" data-setqty="${q - 1}" data-vare="${esc(v)}" aria-label="Én mindre, ${q - 1}" ${q <= 1 && fromD ? 'disabled' : ''}>${icon.minus}</button>${[...(fromD ? [] : [0]), 1, 2, 3, 4].map((n) => `<button type="button" data-setqty="${n}" data-vare="${esc(v)}" aria-pressed="${n === q}">${n === 0 ? 'Fjern' : n}</button>`).join('')}<button type="button" data-setqty="${q + 1}" data-vare="${esc(v)}" aria-label="Én mere, ${q + 1}">${icon.plus}</button></div>${extraPanel(v)}` : ''}
         <span class="ticks print-only" aria-hidden="true">${[1, 2, 3, 4].map((p) => `<span class="mark" data-p="${p}">${p}</span>`).join('')}</span>
       </li>`; }).join('')}</ul></section>`).join('');
     const hb = habits(6);
@@ -469,7 +490,7 @@
     const t = W().ticks[v] || 0;
     if (!c || !c.p1) {
       return `${back('#/indkob', 'Indkøb')}<div class="card-head"><h1 tabindex="-1">${esc(v)}</h1></div>
-        <div class="qtyrow no-print"><span class="label">${onList(v) ? 'Antal på listen' : 'Ikke på listen'}</span>${stepper(v, 'kort')}</div>
+        <div class="qtyrow no-print"><span class="label">${onList(v) ? 'Antal på listen' : 'Ikke på listen'}</span>${stepper(v, 'kort')}</div>${onList(v) ? extraPanel(v) : ''}
         <div class="empty"><h2>Ingen har skrevet, hvilken det skal være</h2><p class="lead">Det skal I afklare: ${esc(askOf[v] || 'hvilken variant I plejer at købe')}</p>
         <div class="actions"><a class="btn btn--primary" href="#/spoerg/${slug(v)}">Spørg hjemme</a><a class="btn btn--quiet" href="#/kort/${slug(v)}/rediger">Udfyld kortet</a></div></div>
         ${suggest(v).length ? suggestBlock(v, c) + `<p class="credit">${OFF_CREDIT}</p>` : ILL[v] ? `<figure class="p1__photo"><img src="${esc(ILL[v].src)}" alt="Illustration af ${esc(lower1(v))}" width="400" height="400"><figcaption class="meta">Illustration. Foto: ${esc(ILL[v].credit)}</figcaption></figure>` : ''}
@@ -487,7 +508,7 @@
     const opts = [[1, 'Prio 1'], [2, 'Prio 2'], [3, 'Prio 3'], [4, 'Ikke fundet']];
     return `${back('#/indkob', 'Indkøb')}
       <div class="card-head"><h1 tabindex="-1">${esc(v)}</h1><p class="meta">${esc(catOf[v] || '')}</p></div>
-      <div class="qtyrow no-print"><span class="label">${onList(v) ? 'Antal på listen' : 'Ikke på listen'}</span>${stepper(v, 'kort')}</div>
+      <div class="qtyrow no-print"><span class="label">${onList(v) ? 'Antal på listen' : 'Ikke på listen'}</span>${stepper(v, 'kort')}</div>${onList(v) ? extraPanel(v) : ''}
       <div class="p1">${mark(1, 'mark--xl', 'Prio 1')}<div class="p1__text"><p class="p1__desc">${nb(c.p1)}</p>${where(1)}${c.ean1 ? `<p class="ean">Stregkode ${esc(c.ean1)}</p>` : ''}</div></div>
       <p class="no-print"><a class="btn btn--quiet btn--s" href="#/scan?vare=${slug(v)}">${icon.scan}<span>Scan og tjek varen</span></a></p>
       ${p1p && p1p.billede ? `<figure class="p1__photo"><img src="${esc(p1p.billede)}" alt="Pakken: ${esc(p1p.own ? c.p1 : prodLabel(p1p))}" width="400" height="400">${p1p.own ? '<figcaption class="meta">Eget foto</figcaption>' : ''}</figure><p class="photo-row no-print">${photoPick('card', v, 1, !!c.foto1)}</p>` : ''}
@@ -499,6 +520,7 @@
       <section class="weekstrip no-print" aria-labelledby="ws"><h2 id="ws">Rækkefølgen i ${weekLabel()}</h2><p class="meta">Træk billederne for at bytte om. Det ændrer kun denne uges liste.</p>${prioStrip(v, 'week')}
         ${hasOv(v) ? `<p class="photo-row"><button class="btn btn--quiet btn--s" type="button" data-ov-save="${esc(v)}">Gem som standard</button><button class="btn btn--quiet btn--s" type="button" data-ov-reset="${esc(v)}">Brug standard</button></p>` : ''}</section>
       ${facts ? `<dl class="facts">${facts}</dl>` : ''}
+      ${friskBlock(v)}
       ${nutOn() ? (() => { const n = nutOf(v); const p1 = prodOf(c, 1); return n ? `<section class="section" aria-labelledby="nh"><h2 id="nh">Næring pr. 100 g ${nutriBadge(n.nutri)}</h2><div class="nutri"><span><b>${fmtN(n.kcal)}</b> kcal</span><span><b>${fmtN(n.protein)} g</b> protein</span><span><b>${fmtN(n.kulh)} g</b> kulhydrat</span><span><b>${fmtN(n.fedt)} g</b> fedt</span>${n.sukker != null ? `<span><b>${fmtN(n.sukker)} g</b> sukker</span>` : ''}${n.salt != null ? `<span><b>${fmtN(n.salt)} g</b> salt</span>` : ''}</div><p class="meta">${n.src === 'produkt' ? `For ${esc(prodLabel(p1))}, fra Open Food Facts.` : 'Typisk værdi for varen, ikke for et bestemt produkt.'}</p></section>` : ''; })() : ''}
       <p class="no-print linkrow"><a class="link link--block" href="#/priser/${slug(v)}">Priser og tilbud</a><a class="link link--block" href="#/kort/${slug(v)}/rediger">Ret kortet</a></p>
       ${p1p && p1p.billede ? '' : `<div class="nophoto no-print"><p class="meta">Intet billede endnu. Tag et foto af pakken, eller vælg produktet, så kommer billedet med.</p><p class="photo-row">${photoPick('card', v, 1, false, 'Tag foto')}<a class="btn btn--quiet btn--s" href="#/vaelg/${slug(v)}?prio=1">Vælg produkt</a></p></div>`}
@@ -763,7 +785,7 @@
   function weekData() {
     const items = listItems(); const order = S.varer.map((x) => x.navn);
     items.sort((a, b) => (order.indexOf(a) - order.indexOf(b)));
-    const rows = items.map((v) => { const c = card(v); const p = priceOf(v); return { name: v, cat: catOf[v] || 'Andet', qty: qtyOf(v), want: c && c.p1 ? c.p1 : '', extra: !fromDishes().has(v), price: p ? `${p.kind === 'ca' ? 'ca. ' : ''}${kr(p.n * qtyOf(v))}${qtyOf(v) > 1 ? ` (${kr(p.n)} stk.)` : ''}` : '' }; });
+    const rows = items.map((v) => { const c = card(v); const p = priceOf(v); return { name: v, cat: catOf[v] || 'Andet', qty: qtyOf(v), want: c && c.p1 ? c.p1 : '', extra: !fromDishes().has(v), opt: isOpt(v), note: extraOf(v), price: p ? `${p.kind === 'ca' ? 'ca. ' : ''}${kr(p.n * qtyOf(v))}${qtyOf(v) > 1 ? ` (${kr(p.n)} stk.)` : ''}` : '' }; });
     const ps = priceSum(items);
     return { week: weekLabel(), title: `Indkøb, ${weekLabel()}`, dishes: W().dishes.slice(), rows, ps, total: sumLine(ps), totalNote: ps.n ? 'Priser fra Open Prices (ODbL) og jeres egne. De fleste er tilbudspriser fra efteråret, så regn med lidt mere.' : '' };
   }
@@ -774,7 +796,7 @@
       L.push(`Retterne i ${d.week} består af:`); d.dishes.forEach((x) => L.push(`- ${x}`)); L.push('');
       L.push('Til det skal der bruges:');
     } else L.push(`Indkøb i ${d.week}:`);
-    const line = (r) => `- ${r.qty} × ${lower1(r.name)}${withWant && r.want ? ` (${r.want})` : ''}`;
+    const line = (r) => `- ${r.qty} × ${lower1(r.name)}${withWant && r.want ? ` (${r.want})` : ''}${r.note ? ` – ${r.note}` : ''}`;
     both.forEach((r) => L.push(line(r)));
     if (extra.length) { if (d.dishes.length) { L.push(''); L.push('Og derudover:'); } extra.forEach((r) => L.push(line(r))); }
     if (d.total) { L.push(''); L.push(`${d.total}.`); }
@@ -1021,7 +1043,7 @@
     const all = priceSum(items);
     return `${back('#/indkob', 'Indkøb')}<div class="screen-head"><div class="titlerow"><h1 tabindex="-1">Overblik</h1><a class="iconbtn iconbtn--plain no-print" href="#/del" aria-label="Del listen">${icon.share}</a></div>${weekNav()}</div>
       <section class="summary"><p class="progress"><b>${items.length}</b><span class="meta">${items.length === 1 ? 'vare' : 'varer'} i ${pl(shops.length, 'butik', 'butikker')}</span></p>${all.n ? `<p class="total"><span class="num">${sumLine(all)}</span></p>` : ''}</section>
-      ${shops.map((sh) => { const vs = by[sh].sort((a, b) => order.indexOf(a) - order.indexOf(b)); const ps = priceSum(vs); return `<section class="group"><h2>${esc(sh)}${ps.n ? `<span class="group__sum num">ca. ${kr(Math.round(ps.sum))}</span>` : ''}</h2><table class="ov"><caption class="visually-hidden">Varer i ${esc(sh)}</caption><tbody>${vs.map((v) => { const c = card(v); const p = priceOf(v); const t = W().ticks[v]; return `<tr${t >= 1 && t <= 3 ? ' class="is-done"' : ''}><td class="ov__q num">${qtyOf(v)} ×</td><td><a class="ov__name" href="#/kort/${slug(v)}">${esc(v)}</a><span class="ov__p">${c && c.p1 ? nb(c.p1) : 'Intet varekort'}${t >= 1 && t <= 3 ? `, fundet (prio ${t})` : t === 4 ? ', ikke fundet' : ''}</span></td><td class="ov__pr num">${p ? `${p.kind === 'ca' ? 'ca. ' : ''}${kr(p.n * qtyOf(v))}` : '–'}</td></tr>`; }).join('')}</tbody></table></section>`; }).join('')}
+      ${shops.map((sh) => { const vs = by[sh].sort((a, b) => order.indexOf(a) - order.indexOf(b)); const ps = priceSum(vs); return `<section class="group"><h2>${esc(sh)}${ps.n ? `<span class="group__sum num">ca. ${kr(Math.round(ps.sum))}</span>` : ''}</h2><table class="ov"><caption class="visually-hidden">Varer i ${esc(sh)}</caption><tbody>${vs.map((v) => { const c = card(v); const p = priceOf(v); const t = W().ticks[v]; return `<tr${t >= 1 && t <= 3 ? ' class="is-done"' : ''}><td class="ov__q num">${qtyOf(v)} ×</td><td><a class="ov__name" href="#/kort/${slug(v)}">${esc(v)}</a><span class="ov__p">${c && c.p1 ? nb(c.p1) : 'Intet varekort'}${t >= 1 && t <= 3 ? `, fundet (prio ${t})` : t === 4 ? ', ikke fundet' : ''}</span>${extraOf(v) ? `<span class="ov__p">${esc(extraOf(v))}</span>` : ''}</td><td class="ov__pr num">${p ? `${p.kind === 'ca' ? 'ca. ' : ''}${kr(p.n * qtyOf(v))}` : '–'}</td></tr>`; }).join('')}</tbody></table></section>`; }).join('')}
       <p class="meta section">Butikken er den, hvor jeres prio 1 er set, eller den, der står på varekortet. Priser: ${esc(PZ.kilde || 'Open Prices')}, og jeres egne.</p>`;
   }
 
@@ -1083,6 +1105,7 @@
       case 'mine': html = mine(q); tab = 'mine'; title = q.get('v') || 'Mine varer'; if (q.get('kat')) { db.mineKat = q.get('kat'); save(); } break;
       case 'profil': html = profil(); tab = 'profil'; title = 'Profil'; break;
       case 'hjaelp': html = hjaelp(q); tab = 'hjaelp'; title = 'Hjælp'; break;
+      case 'frisk': html = frisk(q); tab = 'hjaelp'; title = 'Er den frisk?'; break;
       case 'ny-opskrift': html = nyOpskrift(q); tab = 'retter'; title = 'Ny opskrift'; break;
       case 'lister': html = lister(); tab = 'indkob'; title = 'Faste lister'; break;
       case 'find-opskrifter': html = findOpskrifter(q); tab = 'retter'; title = 'Find opskrifter'; break;
@@ -1208,7 +1231,7 @@
   main.addEventListener('input', (e) => {
     if (!e.target.matches('[data-minesearch]')) return;
     const t = norm(e.target.value); const rows = [...main.querySelectorAll('.minelist li')];
-    if (!t) { rerender(); document.getElementById('minesq')?.focus(); return; }
+    if (!t) { rerender(); document.getElementById('minesq')?.focus({ preventScroll: true }); return; }
     let n = 0; rows.forEach((li) => { const hit = li.dataset.name.includes(t) || stem(li.dataset.name).includes(stem(t)); li.hidden = !hit; n += hit; });
     main.querySelectorAll('.minecats .chip').forEach((c) => c.removeAttribute('aria-current'));
     document.getElementById('mine-none').hidden = !!n;
@@ -1222,7 +1245,20 @@
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const nx = e.key === 'ArrowDown' ? Math.min(opts.length - 1, cur + 1) : Math.max(0, cur - 1); opts.forEach((o, i) => o.setAttribute('aria-selected', String(i === nx))); e.target.setAttribute('aria-activedescendant', opts[nx].id); opts[nx].scrollIntoView({ block: 'nearest' }); }
     if (e.key === 'Escape') { list.hidden = true; e.target.setAttribute('aria-expanded', 'false'); }
   });
+  main.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-note]')) { e.preventDefault(); e.target.blur(); } });
+  main.addEventListener('input', (e) => {
+    if (!e.target.matches('[data-frsearch]')) return;
+    const t = norm(e.target.value); let n = 0;
+    main.querySelectorAll('#frlist [data-q]').forEach((li) => { const hit = !t || t.split(' ').every((w) => li.dataset.q.includes(w) || li.dataset.q.includes(stem(w))); li.hidden = !hit; n += hit; const d = li.querySelector('details'); if (t && hit && d) d.open = true; });
+    main.querySelectorAll('#frlist .group').forEach((g) => { g.hidden = !g.querySelector('[data-q]:not([hidden])'); });
+    document.getElementById('fr-none').hidden = !!n;
+  });
   main.addEventListener('change', async (e) => {
+    if (e.target.matches('[data-note]')) {
+      const v = e.target.dataset.note; const val = e.target.value.trim(); W().note ||= {}; if (val) W().note[v] = val; else delete W().note[v]; save();
+      const li = e.target.closest('.row'); if (li) { let el = li.querySelector('.row__note'); if (val) { if (!el) { el = document.createElement('span'); el.className = 'row__note'; li.querySelector('.row__txt').append(el); } el.textContent = val; } else el?.remove(); }
+      return;
+    }
     const ing = e.target.closest('input[data-ing]');
     if (ing) { const d = decodeURIComponent(location.hash.split('/')[2]); W().skip ||= {}; const set = new Set(W().skip[d] || []); ing.checked ? set.delete(ing.dataset.ing) : set.add(ing.dataset.ing); W().skip[d] = [...set]; save(); rerender(); document.querySelector(`[data-ing="${CSS.escape(ing.dataset.ing)}"]`)?.focus({ preventScroll: true }); return; }
     const dn = e.target.closest('[data-dnote]');
@@ -1237,7 +1273,7 @@
       } catch (err) { alertLine(err.message); }
       return;
     }
-    if (e.target.matches('[data-aldrig]')) { const v = e.target.dataset.aldrig; const pf = prof(); pf.aldrig = e.target.checked ? pf.aldrig.filter((x) => x !== v) : [...new Set([...pf.aldrig, v])]; save(); rerender(); document.getElementById(`nv-${slug(v)}`)?.focus(); alertLine(e.target.checked ? `${v} kommer på listen igen.` : `${v} er taget af listen.`); return; }
+    if (e.target.matches('[data-aldrig]')) { const v = e.target.dataset.aldrig; const pf = prof(); pf.aldrig = e.target.checked ? pf.aldrig.filter((x) => x !== v) : [...new Set([...pf.aldrig, v])]; save(); rerender(); document.getElementById(`nv-${slug(v)}`)?.focus({ preventScroll: true }); alertLine(e.target.checked ? `${v} kommer på listen igen.` : `${v} er taget af listen.`); return; }
     if (e.target.matches('[data-ownvid]') && e.target.files && e.target.files[0]) {
       const id = e.target.dataset.ownvid; const f = e.target.files[0]; const h = document.getElementById('ownvid-help');
       if (f.size > 200 * 1024 * 1024) { h.textContent = 'Videoen er for stor. Optag en kortere, under et par minutter.'; return; }
@@ -1255,15 +1291,16 @@
         .catch(() => { h.textContent = 'Filen kunne ikke læses. Vælg en kopi, der er gemt fra Varevennen.'; });
       return;
     }
-    if (e.target.matches('[data-nutsw]')) { prof().naering = e.target.checked; save(); rerender(); document.getElementById('nutsw')?.focus(); toast(e.target.checked ? 'Næring er slået til.' : 'Næring er slået fra.'); return; }
+    if (e.target.matches('[data-nutsw]')) { prof().naering = e.target.checked; save(); rerender(); document.getElementById('nutsw')?.focus({ preventScroll: true }); toast(e.target.checked ? 'Næring er slået til.' : 'Næring er slået fra.'); return; }
     if (e.target.matches('[data-withwant]')) { const t = document.getElementById('sharetext'); if (t) t.textContent = shareText(weekData(), e.target.checked); return; }
-    if (e.target.matches('[data-shop]')) { db.shop = e.target.value; save(); rerender(); document.getElementById('shop')?.focus(); return; }
+    if (e.target.matches('[data-shop]')) { db.shop = e.target.value; save(); rerender(); document.getElementById('shop')?.focus({ preventScroll: true }); return; }
     if (e.target.matches('[data-unknown]')) { location.replace(e.target.dataset.unknown); }
   });
 
   // ---------- events ----------
   let focusNext = false;
-  const rerender = () => { focusNext = false; render(); };
+  // redraw the same screen in place: keep the scroll position, never jump
+  const rerender = () => { const y = window.scrollY; focusNext = false; render(); window.scrollTo(0, y); };
   document.addEventListener('click', (e) => {
     const a = e.target.closest('a[href^="#/"]');
     if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey) return;
@@ -1283,7 +1320,7 @@
     const pb = e.target.closest('[data-port]');
     if (pb) { const d = pb.dataset.dishName; const o = OP[d]; const base = (o && o.personer) || 4; db.port ||= {}; db.port[d] = Math.max(1, Math.min(20, ((db.port[d]) || base) + +pb.dataset.port)); save(); rerender(); main.querySelector(`[data-port="${pb.dataset.port}"]:not([disabled])`)?.focus({ preventScroll: true }); alertLine(`${db.port[d]} personer.`); return; }
     const ll = e.target.closest('[data-loadlist]');
-    if (ll) { const x = db.lister[ll.dataset.loadlist]; if (x.butik) db.shop = x.butik; W().dishes = [...new Set([...W().dishes, ...x.dishes.filter((d) => S.retter[d])])]; W().extra ||= {}; W().qty ||= {}; Object.keys(x.extra || {}).forEach((v) => { W().extra[v] = true; }); Object.entries(x.qty || {}).forEach(([v, n]) => { W().qty[v] = Math.max(W().qty[v] || 1, n); }); Object.entries(x.skip || {}).forEach(([d, l]) => { (W().skip ||= {})[d] = l; }); save(); if (location.hash.split('?')[0] === '#/indkob') rerender(); else location.hash = '#/indkob'; setTimeout(() => toast(`${ll.dataset.loadlist} er hentet ind i ${weekLabel()}.`), 50); return; }
+    if (ll) { const x = db.lister[ll.dataset.loadlist]; if (x.butik) db.shop = x.butik; W().dishes = [...new Set([...W().dishes, ...x.dishes.filter((d) => S.retter[d])])]; W().extra ||= {}; W().qty ||= {}; Object.keys(x.extra || {}).forEach((v) => { W().extra[v] = true; }); Object.entries(x.qty || {}).forEach(([v, n]) => { W().qty[v] = Math.max(W().qty[v] || 1, n); }); Object.entries(x.skip || {}).forEach(([d, l]) => { (W().skip ||= {})[d] = l; }); Object.assign(W().opt ||= {}, x.opt || {}); Object.assign(W().note ||= {}, x.note || {}); save(); if (location.hash.split('?')[0] === '#/indkob') rerender(); else location.hash = '#/indkob'; setTimeout(() => toast(`${ll.dataset.loadlist} er hentet ind i ${weekLabel()}.`), 50); return; }
     const dl = e.target.closest('[data-dellist]');
     if (dl) { if (!confirm(`Slet listen ${dl.dataset.dellist}?`)) return; delete db.lister[dl.dataset.dellist]; save(); if (location.hash.startsWith('#/liste/')) location.hash = '#/lister'; else rerender(); toast(`${dl.dataset.dellist} er slettet.`); return; }
     const lq = e.target.closest('[data-lq]');
@@ -1401,7 +1438,9 @@
       return;
     }
     const u = e.target.closest('[data-undo]');
-    if (u && undo) { W().ticks[undo.v] = undo.t; const v = undo.v; undo = null; save(); rerender(); document.querySelector(`[data-tick="${CSS.escape(v)}"]`)?.focus(); return; }
+    if (u && undo) { W().ticks[undo.v] = undo.t; const v = undo.v; undo = null; save(); rerender(); document.querySelector(`[data-tick="${CSS.escape(v)}"]`)?.focus({ preventScroll: true }); return; }
+    const ot = e.target.closest('[data-opt]');
+    if (ot) { const v = ot.dataset.opt; W().opt ||= {}; if (W().opt[v]) delete W().opt[v]; else W().opt[v] = true; save(); buzz(); rerender(); main.querySelector(`[data-opt="${CSS.escape(v)}"]`)?.focus({ preventScroll: true }); toast(isOpt(v) ? `${v} kan undværes.` : `${v} skal med.`); return; }
     const qo = e.target.closest('[data-qtyopen]');
     if (qo) { qtyOpen = qtyOpen === qo.dataset.qtyopen ? null : qo.dataset.qtyopen; rerender(); (main.querySelector('.qtybar [aria-pressed="true"]') || main.querySelector(`[data-qtyopen="${CSS.escape(qo.dataset.qtyopen)}"]`))?.focus({ preventScroll: true }); return; }
     const sq = e.target.closest('[data-setqty]');
@@ -1413,12 +1452,12 @@
     if (t) {
       const v = t.dataset.tick;
       if (W().ticks[v]) { undo = { v, t: W().ticks[v] }; W().ticks[v] = 0; } else { undo = null; learnRoute(v); W().ticks[v] = +t.dataset.p || 1; buzz(); }
-      save(); rerender(); document.querySelector(`[data-tick="${CSS.escape(v)}"]`)?.focus(); return;
+      save(); rerender(); document.querySelector(`[data-tick="${CSS.escape(v)}"]`)?.focus({ preventScroll: true }); return;
     }
     const ph = e.target.closest('[data-photo]');
     if (ph) { const h = main.querySelector('[data-photo-help]'); if (h) h.textContent = 'Kameraet er ikke koblet på endnu i prototypen.'; return; }
     const f = e.target.closest('[data-found]');
-    if (f) { const v = decodeURIComponent(location.hash.split('/')[2]); W().ticks[v] = +f.dataset.found; undo = null; buzz(); save(); rerender(); document.querySelector(`[data-found="${f.dataset.found}"]`)?.focus(); return; }
+    if (f) { const v = decodeURIComponent(location.hash.split('/')[2]); W().ticks[v] = +f.dataset.found; undo = null; buzz(); save(); rerender(); document.querySelector(`[data-found="${f.dataset.found}"]`)?.focus({ preventScroll: true }); return; }
     const fs = e.target.closest('[data-found-scan]');
     if (fs) { const v = fs.dataset.vare; W().ticks[v] = +fs.dataset.foundScan; if (!onList(v)) { W().extra[v] = 1; } buzz(); save(); location.hash = '#/indkob'; return; }
     const tch = e.target.closest('[data-teach]');
@@ -1450,19 +1489,19 @@
       if (!n) { form.nln.setAttribute('aria-invalid', 'true'); help.dataset.error = ''; help.textContent = 'Giv listen et navn.'; form.nln.focus(); return; }
       if (db.lister && db.lister[n]) { form.nln.setAttribute('aria-invalid', 'true'); help.dataset.error = ''; help.textContent = 'Der findes allerede en liste med det navn.'; form.nln.focus(); return; }
       const fromWeek = form.nlw.checked;
-      (db.lister ||= {})[n] = fromWeek ? JSON.parse(JSON.stringify({ dishes: W().dishes, extra: W().extra || {}, qty: W().qty || {}, skip: W().skip || {}, butik: form.nlb.value })) : { dishes: [], extra: {}, qty: {}, skip: {}, butik: form.nlb.value };
+      (db.lister ||= {})[n] = fromWeek ? JSON.parse(JSON.stringify({ dishes: W().dishes, extra: W().extra || {}, qty: W().qty || {}, skip: W().skip || {}, opt: W().opt || {}, note: W().note || {}, butik: form.nlb.value })) : { dishes: [], extra: {}, qty: {}, skip: {}, butik: form.nlb.value };
       save(); location.hash = `#/liste/${slug(n)}`; return;
     }
     if (form.id === 'listaddform') {
       const n = form.dataset.liste; const x = db.lister[n]; const t = form.lsa.value.trim(); const help = document.getElementById('lsa-help');
       if (!t) { help.textContent = 'Skriv en vare.'; form.lsa.focus(); return; }
       const hit = findItems(t, 1)[0]; const v = hit && (norm(hit) === norm(t) || norm(hit).startsWith(norm(t))) ? hit : newItem(t);
-      x.extra ||= {}; x.qty ||= {}; x.extra[v] = true; x.qty[v] = (x.qty[v] || 0) + 1; save(); rerender(); document.getElementById('lsa')?.focus(); toast(`${v} er på ${n}.`); return;
+      x.extra ||= {}; x.qty ||= {}; x.extra[v] = true; x.qty[v] = (x.qty[v] || 0) + 1; save(); rerender(); document.getElementById('lsa')?.focus({ preventScroll: true }); toast(`${v} er på ${n}.`); return;
     }
     if (form.id === 'saveform') {
       const n = form.ln.value.trim(); const help = document.getElementById('save-list-help');
       if (!n) { form.ln.setAttribute('aria-invalid', 'true'); help.dataset.error = ''; help.textContent = 'Giv listen et navn.'; form.ln.focus(); return; }
-      db.lister ||= {}; const had = !!db.lister[n]; db.lister[n] = JSON.parse(JSON.stringify({ dishes: W().dishes, extra: W().extra || {}, qty: W().qty || {}, skip: W().skip || {} }));
+      db.lister ||= {}; const had = !!db.lister[n]; db.lister[n] = JSON.parse(JSON.stringify({ dishes: W().dishes, extra: W().extra || {}, qty: W().qty || {}, skip: W().skip || {}, opt: W().opt || {}, note: W().note || {} }));
       save(); rerender(); toast(had ? `${n} er opdateret.` : `${n} er gemt.`); return;
     }
     if (form.id === 'recipeform') {

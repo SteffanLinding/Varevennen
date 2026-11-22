@@ -849,3 +849,19 @@ label.btn:has(input:focus-visible) { outline: 2px solid var(--color-focus); outl
 .weeknav__now svg { width: 18px; height: 18px; }
 .weeknav__now[aria-pressed="true"] { border: 2px solid var(--color-ink); background: var(--color-paper); font-weight: 800; }
 @media (max-width: 22em) { .weeknav__now { width: 6.5rem; } .weeknav__now svg { display: none; } }
+/* notes, "kan undværes" and the freshness guide */
+.rowextra { grid-column: 1 / -1; display: grid; gap: var(--space-xs); padding: 0 0 var(--space-sm); justify-items: start; }
+.rowextra__note { width: 100%; }
+.rowextra__frisk { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.qtyrow + .rowextra { margin-top: var(--space-xs); }
+.badge--opt { background: var(--color-paper-3); color: var(--color-ink); justify-self: start; }
+.row__note { font-size: var(--text-sm); color: var(--color-ink); overflow-wrap: anywhere; }
+.row.is-opt .row__name { font-weight: 400; }
+.row.is-opt .row__open { opacity: 1; }
+.frisk__h { margin-top: var(--space-sm); font-weight: 600; }
+.frisk__yes, .frisk__no { list-style: none; margin: var(--space-3xs) 0 0; padding: 0; display: grid; gap: var(--space-3xs); }
+.frisk__yes li, .frisk__no li { display: flex; align-items: flex-start; gap: var(--space-xs); }
+.frisk__yes svg, .frisk__no svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 3px; }
+.frisk__no svg { color: var(--color-ink-2); }
+.frisk { padding: var(--space-md); background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.frisk .meta { margin-top: var(--space-sm); }

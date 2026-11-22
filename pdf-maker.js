@@ -55,6 +55,7 @@
       const nameW = W - pad * 2 - colW - 8;
       text(`${r.qty > 1 ? r.qty + ' × ' : ''}${r.name}`, pad, small ? 10 : 11, bold, ink, nameW);
       if (r.want) text(r.want, pad, small ? 7.5 : 8.5, reg, soft, nameW);
+      if (r.note) text(r.note, pad, small ? 7.5 : 8.5, bold, ink, nameW);
       if (r.price) text(r.price, pad, small ? 7 : 8, reg, soft, nameW);
       const by = top - 6 - s;
       const g = form.createRadioGroup(`${++n}. ${r.name}`);
