@@ -120,7 +120,8 @@
   const RB = window.RETTER_BILLEDER || {};
   // own photos win over product photos and stock photos
   const imgOf = (c, n) => c && c['foto' + n] ? { billede: c['foto' + n], own: true } : prodOf(c, n);
-  const dishImg = (d) => (db.dishFoto && db.dishFoto[d]) || (RB[d] && RB[d].src) || (window.BANK_BILLEDER && window.BANK_BILLEDER[d] && window.BANK_BILLEDER[d].src) || '';
+  // a ready meal has no photo of its own: show the pack of the first item
+  const dishImg = (d) => (db.dishFoto && db.dishFoto[d]) || (RB[d] && RB[d].src) || (window.BANK_BILLEDER && window.BANK_BILLEDER[d] && window.BANK_BILLEDER[d].src) || ((window.FAERDIG_RETTER || []).includes(d) && S.retter[d] && S.retter[d][0] && (itemImg(S.retter[d][0]) || {}).src) || '';
   const photoPick = (kind, key, n, has, label) => `<label class="btn btn--quiet btn--s photo-pick">${icon.camera}<span>${has ? 'Skift foto' : label || 'Eget foto'}</span><input type="file" accept="image/*" class="visually-hidden" data-photo="${kind}" data-key="${esc(key)}" data-n="${n}" aria-label="${has ? 'Skift eget foto' : 'Tag eller vælg eget foto'}"></label>${has ? `<button class="btn btn--quiet btn--s" type="button" data-photo-del="${kind}" data-key="${esc(key)}" data-n="${n}">Fjern foto</button>` : ''}`;
   const byEan = {};
   Object.values(PR).forEach((list) => list.forEach((p) => { byEan[p.ean] = p; }));
@@ -346,6 +347,7 @@
     if (u === 'g' || u === 'gram') return n; if (u === 'kg') return n * 1000;
     if (u === 'dl') return n * 100; if (u === 'l' || u === 'liter') return n * 1000; if (u === 'ml') return n;
     if (u === 'spsk') return n * (/mel|rasp|sukker/i.test(v) ? 10 : 15); if (u === 'tsk') return n * 4;
+    if (NAE.vaegt[v] && ['stk', 'hoved', 'pakke', 'pakker', 'pose', 'poser', 'bakke', 'bakker', 'dåse', 'dåser'].includes(u)) return n * NAE.vaegt[v];
     if (u === 'stk' || u === 'hoved') return n * (NAE.vaegt[v] || 100);
     if (NAE.vaegt[v] && !NAE.enhed[u]) return n * NAE.vaegt[v];
     return n * (NAE.enhed[u] || NAE.vaegt[v] || 100);
@@ -432,7 +434,7 @@
   const SAESON_ORD = { vinter: 'vinteren', 'forår': 'foråret', sommer: 'sommeren', 'efterår': 'efteråret' };
   const mins = (t) => { const x = String(t || ''); const h = /(\d+)\s*t/.exec(x); const m = /(\d+)\s*min/.exec(x); return (h ? +h[1] * 60 : 0) + (m ? +m[1] : 0) || null; };
   const IKKE_AFTENSMAD = ['Rabarbergrød med fløde', 'Koldskål med kammerjunkere'];
-  const FILT = [['hurtig', 'Hurtig, under 30 min'], ['veg', 'Vegetar'], ['saeson', 'Passer til årstiden'], ['egne', 'Jeres egne'], ['nyt', 'Noget nyt']];
+  const FILT = [['hurtig', 'Hurtig, under 30 min'], ['veg', 'Vegetar'], ['saeson', 'Passer til årstiden'], ['egne', 'Jeres egne'], ['nyt', 'Noget nyt'], ['faerdig', 'Færdigretter']];
   let chooser = { mode: 'en', f: new Set(), items: [], seen: new Set(), n: 5, added: {}, empty: false };
   let prevRoute = '';
   function dishPool() {
@@ -453,6 +455,7 @@
     if (f.has('saeson') && !d.saeson.includes(nowSeason())) return false;
     if (f.has('egne') && d.src !== 'egen') return false;
     if (f.has('nyt') && d.src !== 'nyt') return false;
+    if (f.has('faerdig') && !FAERDIG.includes(d.n)) return false;
     return true;
   }
   const catOfDish = (d) => (d.r ? d.r.kategori : emneOf(d.n));
@@ -460,7 +463,7 @@
     const rec = recentDishes(); const pool = dishPool().filter((d) => eligible(d, chooser.f) && !exclude.has(d.n) && !keep.some((k) => k.n === d.n)); const out = [];
     while (out.length < count && pool.length) {
       const used = [...keep, ...out];
-      const w = pool.map((d) => { let x = 1; if (d.saeson.includes(nowSeason())) x *= 2; if (rec.has(d.n)) x *= 0.25; if (used.some((u) => u.ings[0] === d.ings[0])) x *= 0.15; if (used.some((u) => catOfDish(u) === catOfDish(d))) x *= 0.5; return x; });
+      const w = pool.map((d) => { let x = 1; if (d.saeson.includes(nowSeason())) x *= 2; if (rec.has(d.n)) x *= 0.25; if (FAERDIG.includes(d.n) && !chooser.f.has('faerdig')) x *= 0.35; if (used.some((u) => u.ings[0] === d.ings[0])) x *= 0.15; if (used.some((u) => catOfDish(u) === catOfDish(d))) x *= 0.5; return x; });
       let t = Math.random() * w.reduce((a, b) => a + b, 0); let i = 0; for (; i < pool.length - 1; i++) { t -= w[i]; if (t <= 0) break; }
       out.push(pool[i]); pool.splice(i, 1);
     }
@@ -504,8 +507,9 @@
     'Pølser og ris': 'Hurtigt i hverdagen', 'Koteletter og ris': 'Hurtigt i hverdagen', 'Fisk med frosne grøntsager og pasta': 'Hurtigt i hverdagen', 'Stegt kylling med grøntsager og pasta': 'Hurtigt i hverdagen', 'Kylling og pommes/pasta': 'Hurtigt i hverdagen', 'Bami goreng': 'Hurtigt i hverdagen',
     'Hotdog': 'Fredag og hygge', 'Frysepizza og nuggets': 'Fredag og hygge', 'Pitabrød': 'Fredag og hygge', 'Forårsruller': 'Fredag og hygge'
   };
-  const EMNE_ORDER = ['Klassikere', 'Hurtigt i hverdagen', 'Pasta og ovnretter', 'Fredag og hygge'];
-  const emneOf = (d) => (db.emne && db.emne[d]) || (db.opskrifter && db.opskrifter[d] && db.opskrifter[d].emne) || EMNE_STD[d] || 'Andre retter';
+  const EMNE_ORDER = ['Klassikere', 'Hurtigt i hverdagen', 'Pasta og ovnretter', 'Fredag og hygge', 'Færdigretter'];
+  const FAERDIG = window.FAERDIG_RETTER || [];
+  const emneOf = (d) => (db.emne && db.emne[d]) || (FAERDIG.includes(d) ? 'Færdigretter' : '') || (db.opskrifter && db.opskrifter[d] && db.opskrifter[d].emne) || EMNE_STD[d] || 'Andre retter';
   const emner = () => [...new Set([...EMNE_ORDER, ...Object.keys(S.retter).map(emneOf)])].filter((e) => Object.keys(S.retter).some((d) => emneOf(d) === e));
 
   // ---------- own recipes live next to the built-in ones ----------
@@ -1101,7 +1105,8 @@
     const credits = bank.filter(([n]) => BB[n]).map(([n]) => `<li>${esc(n)}: ${esc(BB[n].credit)}</li>`).join('');
     return head + results + `<div id="bogshelves">
       ${shelf(`Lige nu: ${now}`, bank.filter(([, r]) => (r.saeson || []).includes(now)).map(([n, r]) => rcard(n, r)), `#/kogebog?saeson=${slug(now)}`)}
-      ${shelf('Gemte retter', own.map((d) => rcard(d, BANK.opskrifter[d] || null)), '#/retter')}
+      ${shelf('Færdigretter', FAERDIG.map((d) => rcard(d, null)), '#/retter?emne=F%C3%A6rdigretter')}
+      ${shelf('Gemte retter', own.filter((d) => !FAERDIG.includes(d)).map((d) => rcard(d, BANK.opskrifter[d] || null)), '#/retter')}
       ${BANK.kategorier.map((k) => shelf(esc(k), bank.filter(([, r]) => r.kategori === k).map(([n, r]) => rcard(n, r)), `#/find-opskrifter?kat=${slug(k)}`)).join('')}
       <p class="section"><a class="btn btn--quiet" href="#/ny-opskrift">${icon.plus}<span>Skriv jeres egen opskrift</span></a></p>
       ${credits ? `<details class="credits"><summary>Fotokreditering</summary><ul>${credits}</ul></details>` : ''}</div>`;

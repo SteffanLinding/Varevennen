@@ -23,6 +23,7 @@ window.NAERING = {
     'Feta': [260, 15, 1, 21], 'Madlavningsfløde': [150, 3, 4, 13], 'Piskefløde': [340, 2, 3, 36], 'Græsk yoghurt': [110, 6, 4, 8], 'Mozzarella': [250, 18, 1, 19], 'Parmesan': [400, 33, 0, 29],
     'Kærnemælk': [37, 3.5, 4.5, 0.5],
     'Frosne grøntsager': [45, 2.5, 6, 0.5], 'Pommes frites': [150, 2.5, 22, 5], 'Frysepizza': [250, 10, 30, 10], 'Kyllingenuggets': [250, 14, 18, 14], 'Forårsruller': [220, 6, 28, 9],
+    'Færdig lasagne': [140, 7, 14, 6], 'Færdig suppe': [45, 1.5, 6, 1.5], 'Færdig pastaret': [150, 7, 17, 6], 'Sushi': [150, 5, 28, 2], 'Tærte': [250, 8, 22, 15], 'Færdige frikadeller': [220, 12, 9, 15],
     'Karry': [330, 12, 55, 14], 'Tarteletter': [520, 7, 55, 30], 'Hotdogbrød': [270, 8, 50, 4], 'Pitabrød': [270, 9, 55, 1.5], 'Tortillas': [300, 8, 50, 7]
   },
   // grams per piece, can, bunch or bag for the item; amounts in g, kg, dl, l, spsk and tsk are counted directly
@@ -31,9 +32,10 @@ window.NAERING = {
     'Hvidløg': 5, 'Citron': 100, 'Ingefær': 30, 'Peberfrugt': 150, 'Squash': 300, 'Søde kartofler': 300, 'Æbler': 150, 'Bananer': 120, 'Hokkaidogræskar': 1200, 'Majskolber': 200,
     'Hvidkål': 1000, 'Rødkål': 1000, 'Hakkede tomater': 400, 'Kikærter': 240, 'Kidneybønner': 240, 'Majs': 285, 'Kokosmælk': 400, 'Asparges': 250, 'Rødbeder': 300,
     'Bouillon': 10, 'Tortillas': 40, 'Pitabrød': 80, 'Hotdogbrød': 45, 'Tarteletter': 15, 'Pølser': 60, 'Svinekoteletter': 180, 'Laks': 125, 'Mozzarella': 125,
+    'Færdig lasagne': 400, 'Færdig suppe': 400, 'Færdig pastaret': 400, 'Sushi': 250, 'Tærte': 350, 'Færdige frikadeller': 400, 'Pommes frites': 600,
     'Dressing': 60, 'Kammerjunkere': 200, 'Grønkål': 500, 'Suppehøne': 900, 'Frysepizza': 350, 'Kyllingenuggets': 20, 'Forårsruller': 60, 'Fiskefilet': 125, 'Kylling': 150
   },
   // the kind of thing an amount word means, when the item itself has no weight
   enhed: { dåse: 400, dåser: 400, pose: 250, poser: 250, pakke: 250, pakker: 250, bundt: 40, bdt: 40, fed: 5, terning: 10, terninger: 10, flaske: 60, spsk: 15, tsk: 5, knivspids: 1, skive: 25, skiver: 25 },
-  kodvarer: ['Hakket svinekød', 'Hakket oksekød', 'Kylling', 'Pølser', 'Fiskefilet', 'Svinekoteletter', 'Flæsk i skiver', 'Suppehøne', 'Laks', 'Skinke', 'Kyllingespyd', 'Flæskesteg', 'Kyllingenuggets', 'Forårsruller', 'Frysepizza']
+  kodvarer: ['Færdige frikadeller', 'Hakket svinekød', 'Hakket oksekød', 'Kylling', 'Pølser', 'Fiskefilet', 'Svinekoteletter', 'Flæsk i skiver', 'Suppehøne', 'Laks', 'Skinke', 'Kyllingespyd', 'Flæskesteg', 'Kyllingenuggets', 'Forårsruller', 'Frysepizza']
 };
