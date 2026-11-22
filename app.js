@@ -35,6 +35,7 @@
   const W = () => (db.weeks[db.week] ||= blankWeek());
   const weekLabel = () => `uge ${weekNo(db.week)}`;
   let undo = null;
+  const viewP = {}; let qtyOpen = null;   // which prio a row shows after a swipe, and which row has the quantity bar open
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); return true; } catch (e) { return false; } };
 
   const RULES = {
@@ -441,20 +442,26 @@
       const hasCard = !!(c && c.p1);
       let best = 1;
       if (hasCard && db.shop) { const hit = [1, 2, 3].find((n) => c['p' + n] && seenIn(prodOf(c, n), db.shop) === 'ja'); if (hit) best = hit; }
-      const want = hasCard ? `<span class="row__want">${best > 1 ? `I ${esc(db.shop)}: prio ${best}, ` : ''}${nb(c['p' + best])}</span>` : `<span class="row__want row__want--none">Intet varekort endnu</span>`;
+      const prios = hasCard ? [1, 2, 3].filter((n) => c['p' + n]) : [];
+      if (viewP[v] && prios.includes(viewP[v])) best = viewP[v];
+      const dots = prios.length > 1 ? `<span class="pdots" aria-hidden="true">${prios.map((n) => `<i${n === best ? ' data-on' : ''}>${n}</i>`).join('')}</span>` : '';
+      const want = hasCard ? `<span class="row__want">${viewP[v] && viewP[v] > 1 ? `Prio ${best}: ` : best > 1 ? `I ${esc(db.shop)}: prio ${best}, ` : ''}${nb(c['p' + best])}</span>${dots}` : `<span class="row__want row__want--none">Intet varekort endnu</span>`;
       const shown = t ? (!hasCard && t !== 4 ? 'ok' : t) : (hasCard ? 'want' : 0);
       const ghost = best;
-      const label = t ? `${esc(v)}, registreret: ${hasCard ? FOUND[t] : (t === 4 ? 'ikke fundet' : 'fundet')}. Tryk for at fjerne markeringen.` : `${esc(v)}, ikke markeret. Tryk når ${hasCard ? 'prio 1 er' : 'den er'} i kurven.`;
-      return `<li class="row"${t ? ' data-done' : ''}>
-        <button class="row__tick no-print" type="button" data-tick="${esc(v)}" aria-label="${label}">${shown === 'want' ? `<span class="mark" data-p="want" aria-hidden="true">${ghost}</span>` : mark(shown)}</button>
-        <a class="row__open" href="#/kort/${slug(v)}">${hasCard ? thumb(imgOf(c, best), 'row__img') : itemImg(v, true) ? `<img class="row__img" src="${esc(itemImg(v, true).src)}" alt="" width="400" height="400" loading="lazy">` : ''}<span class="row__txt"><span class="row__name">${esc(v)}${qtyOf(v) > 1 ? `<span class="qty"> × ${qtyOf(v)}</span>` : ''}</span>${want}${!fromDishes().has(v) ? '<span class="row__want">Ekstra vare</span>' : ''}</span>${priceOf(v) ? `<span class="row__price num" title="${esc(priceOf(v).label)}">${priceOf(v).kind === 'ca' ? 'ca. ' : ''}${kr(priceOf(v).n * qtyOf(v))}</span>` : ''}</a>
+      const label = t ? `${esc(v)}, registreret: ${hasCard ? FOUND[t] : (t === 4 ? 'ikke fundet' : 'fundet')}. Tryk for at fjerne markeringen.` : `${esc(v)}, ikke markeret. Tryk når ${hasCard ? `prio ${best} er` : 'den er'} i kurven.`;
+      const q = qtyOf(v); const open = qtyOpen === v; const fromD = fromDishes().has(v);
+      return `<li class="row${open ? ' is-qty' : ''}"${t ? ' data-done' : ''}>
+        <button class="row__tick no-print" type="button" data-tick="${esc(v)}" data-p="${best}" aria-label="${label}">${shown === 'want' ? `<span class="mark" data-p="want" aria-hidden="true">${ghost}</span>` : mark(shown)}</button>
+        <a class="row__open" draggable="false" href="#/kort/${slug(v)}" data-swipe="${esc(v)}" data-prios="${prios.join(',')}"${prios.length > 1 ? ` aria-describedby="swipe-help"` : ''}>${hasCard ? thumb(imgOf(c, best), 'row__img') : itemImg(v, true) ? `<img class="row__img" src="${esc(itemImg(v, true).src)}" alt="" width="400" height="400" loading="lazy">` : ''}<span class="row__txt"><span class="row__name">${esc(v)}${qtyOf(v) > 1 ? `<span class="qty"> × ${qtyOf(v)}</span>` : ''}</span>${want}${!fromDishes().has(v) ? '<span class="row__want">Ekstra vare</span>' : ''}</span>${priceOf(v) ? `<span class="row__price num" title="${esc(priceOf(v).label)}">${priceOf(v).kind === 'ca' ? 'ca. ' : ''}${kr(priceOf(v).n * qtyOf(v))}</span>` : ''}</a>
+        <button class="row__qty no-print" type="button" data-qtyopen="${esc(v)}" aria-expanded="${open}" aria-label="Antal ${esc(v)}: ${q}. Tryk for at ændre">${q > 1 ? `× ${q}` : q}</button>
+        ${open ? `<div class="qtybar no-print" role="group" aria-label="Vælg antal ${esc(v)}">${[...(fromD ? [] : [0]), 1, 2, 3, 4, 5, 6].map((n) => `<button type="button" data-setqty="${n}" data-vare="${esc(v)}" aria-pressed="${n === q}">${n === 0 ? 'Fjern' : n}</button>`).join('')}<button type="button" data-setqty="${q + 1}" data-vare="${esc(v)}" aria-label="Én mere, ${q + 1}">${icon.plus}</button></div>` : ''}
         <span class="ticks print-only" aria-hidden="true">${[1, 2, 3, 4].map((p) => `<span class="mark" data-p="${p}">${p}</span>`).join('')}</span>
       </li>`; }).join('')}</ul></section>`).join('');
     const hb = habits(6);
     const LN = Object.keys(db.lister || {});
     const fixedRow = LN.length ? `<section class="habits no-print" aria-labelledby="flh"><h2 id="flh">Faste lister</h2><ul class="habits__list">${LN.map((n) => `<li><button type="button" class="habit" data-loadlist="${esc(n)}" aria-label="Hent ${esc(n)} ind i ${weekLabel()}">${icon.plus}<span>${esc(n)}${db.lister[n].butik ? ` <small>${esc(db.lister[n].butik)}</small>` : ''}</span></button></li>`).join('')}</ul></section>` : '';
     const habitRow = fixedRow + (hb.length ? `<section class="habits no-print" aria-labelledby="hbh"><h2 id="hbh">I plejer også at købe</h2><ul class="habits__list">${hb.map((v) => { const im = itemImg(v); return `<li><button type="button" class="habit" data-add="${esc(v)}" aria-label="Læg ${esc(v)} på listen">${im ? `<img src="${esc(im.src)}" alt="" width="40" height="40">` : ''}<span>${esc(v)}</span>${icon.plus}</button></li>`; }).join('')}</ul></section>` : '');
-    return head + habitRow + err + undoLine + rows + composer();
+    return head + habitRow + err + undoLine + rows + `<p class="visually-hidden" id="swipe-help">Brug piletasterne for at se prio 2 og 3.</p>` + composer();
   }
 
   function kort(v) {
@@ -809,7 +816,7 @@
     const withData = Object.values(PR).flat().filter((p) => (p.allergener || []).length || (p.spor || []).length).length;
     const allP = Object.values(PR).flat().length;
     return `<div class="screen-head"><h1 tabindex="-1">Profil og indstillinger</h1><p class="lead">Det her gælder hele husstanden, og det gemmes på telefonen.</p></div>
-      <nav class="toc" aria-label="På siden"><a class="chip" href="#/profil?vis=p-allergi" data-replace>Allergier</a><a class="chip" href="#/profil?vis=p-aldrig" data-replace>Varer I aldrig køber</a><a class="chip" href="#/profil?vis=p-butik" data-replace>Butik</a><a class="chip" href="#/profil?vis=p-naering" data-replace>Næring</a><a class="chip" href="#/profil?vis=p-data" data-replace>Data</a><a class="chip" href="#/profil?vis=p-varer" data-replace>Jeres varer</a><a class="chip" href="#/teknikker">Sådan gør du</a></nav>
+      <nav class="toc" aria-label="På siden"><a class="chip" href="#/profil?vis=p-allergi" data-replace>Allergier</a><a class="chip" href="#/profil?vis=p-aldrig" data-replace>Varer I aldrig køber</a><a class="chip" href="#/profil?vis=p-butik" data-replace>Butik</a><a class="chip" href="#/profil?vis=p-naering" data-replace>Næring</a><a class="chip" href="#/profil?vis=p-data" data-replace>Data</a><a class="chip" href="#/hjaelp">Hjælp</a><a class="chip" href="#/profil?vis=p-varer" data-replace>Jeres varer</a><a class="chip" href="#/teknikker">Sådan gør du</a></nav>
       <section class="section" id="p-allergi" aria-labelledby="pa"><h2 id="pa">Allergier</h2>
         <p class="meta">Varer, der selv er allergenet, tages af listen, fx æg ved æggeallergi. Produkter, der indeholder det eller kan have spor af det, skjules i forslag og når I vælger produkt.</p>
         <div class="chips chips--wrap" role="group" aria-label="Allergier">${ALLERGENER.map((a) => `<button type="button" class="chip" data-allergi="${a.id}" aria-pressed="${pf.allergi.includes(a.id)}">${pf.allergi.includes(a.id) ? icon.check : ''}${esc(a.navn)}</button>`).join('')}</div>
@@ -1018,6 +1025,42 @@
       <p class="meta section">Butikken er den, hvor jeres prio 1 er set, eller den, der står på varekortet. Priser: ${esc(PZ.kilde || 'Open Prices')}, og jeres egne.</p>`;
   }
 
+  // swipe a row on Indkøb to see prio 2 and 3 (arrow keys do the same)
+  let sw = null, swiped = false;
+  const swipeTo = (el, dir) => { const v = el.dataset.swipe; const ps = (el.dataset.prios || '').split(',').filter(Boolean).map(Number); if (ps.length < 2) return false; const cur = viewP[v] || ps[0]; const i = ps.indexOf(cur); const nx = ps[Math.max(0, Math.min(ps.length - 1, i + dir))]; if (nx === cur) { el.animate?.([{ transform: `translateX(${dir * -8}px)` }, { transform: 'none' }], { duration: 160 }); return false; } viewP[v] = nx; buzz(); rerender(); const n = main.querySelector(`[data-swipe="${CSS.escape(v)}"]`); n?.focus({ preventScroll: true }); n?.classList.add(dir > 0 ? 'from-right' : 'from-left'); alertLine(`${v}: prio ${nx}.`); return true; };
+  main.addEventListener('dragstart', (e) => { if (e.target.closest && e.target.closest('[data-swipe]')) e.preventDefault(); });
+  main.addEventListener('pointerdown', (e) => { const el = e.target.closest('[data-swipe]'); if (!el || e.button > 0) return; sw = { el, x: e.clientX, y: e.clientY, on: false }; });
+  main.addEventListener('pointermove', (e) => { if (!sw) return; const dx = e.clientX - sw.x; const dy = e.clientY - sw.y; if (!sw.on && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.3) sw.on = true; if (sw.on) sw.el.style.transform = `translateX(${Math.max(-80, Math.min(80, dx * 0.6))}px)`; });
+  const swEnd = (e) => { if (!sw) return; const { el, x, on } = sw; sw = null; el.style.transform = ''; if (!on) return; swiped = true; setTimeout(() => { swiped = false; }, 350); const dx = e.clientX - x; if (Math.abs(dx) > 45) swipeTo(el, dx < 0 ? 1 : -1); };
+  main.addEventListener('pointerup', swEnd); main.addEventListener('pointercancel', (e) => { if (sw) { sw.el.style.transform = ''; sw = null; } });
+  main.addEventListener('click', (e) => { if (swiped && e.target.closest('[data-swipe]')) { e.preventDefault(); e.stopPropagation(); } }, true);
+  main.addEventListener('keydown', (e) => { const el = e.target.closest && e.target.closest('[data-swipe]'); if (el && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); swipeTo(el, e.key === 'ArrowRight' ? 1 : -1); } });
+
+  // ---------- help: search "how do I…", and a short intro the first time ----------
+  const HELP = window.HJAELP || [];
+  function hjaelp(q) {
+    const t = q.get('q') || '';
+    return `<div class="screen-head"><h1 tabindex="-1">Hjælp</h1><p class="lead">Søg på det, du vil gøre, fx "antal", "scan" eller "allergi".</p></div>
+      <div class="field minesearch"><label class="visually-hidden" for="helpq">Søg i hjælpen</label><span class="composer__field">${icon.search}<input id="helpq" type="search" placeholder="Hvad vil du gøre?" value="${esc(t)}" autocomplete="off" data-helpsearch></span></div>
+      <ul class="help-list">${HELP.map((h, i) => `<li data-q="${esc(norm(h.q + ' ' + h.a + ' ' + h.ord))}"><details${t && i === 0 ? ' open' : ''}><summary>${esc(h.q)}</summary><p>${esc(h.a)}</p><p><a class="btn btn--quiet btn--s" href="${h.link}">${esc(h.knap)}</a></p></details></li>`).join('')}</ul>
+      <p class="meta" id="help-none" hidden>Intet svar på det. Prøv et andet ord, eller se introduktionen igen.</p>
+      <p class="section"><button class="btn btn--quiet" type="button" data-intro>Se introduktionen igen</button></p>`;
+  }
+  const INTRO = [
+    { h: 'Velkommen til Varevennen', p: 'Appen sørger for, at den, der handler, kommer hjem med præcis den vare, I plejer at købe. Ikke bare "mælk", men jeres mælk.' },
+    { h: 'Hver vare har et varekort', p: 'Prio 1 er den rigtige. Prio 2 er godkendt. Prio 3 er en nødløsning. Ret dem under Mine varer.', marks: true },
+    { h: 'I butikken', p: 'Tryk på mærket, når varen er i kurven. Swipe en vare til siden for at se prio 2 og 3. Tryk på tallet til højre for at ændre antal. Scan en vare for at tjekke, at den er rigtig.' },
+    { h: 'Retter og kogebog', p: 'Vælg ugens retter under Retter, så bygger listen sig selv. I Kogebogen finder I flere opskrifter. Er du i tvivl, så tryk på spørgsmålstegnet øverst.' }
+  ];
+  function showIntro() {
+    let i = 0; const dlg = document.createElement('dialog'); dlg.className = 'intro'; dlg.setAttribute('aria-labelledby', 'intro-h');
+    const draw = () => { const s = INTRO[i]; dlg.innerHTML = `<div class="intro__in"><p class="intro__step meta">${i + 1} af ${INTRO.length}</p><h2 id="intro-h">${esc(s.h)}</h2>${s.marks ? `<div class="intro__marks">${[1, 2, 3].map((n) => `<span>${mark(n)}<small>${['Den rigtige', 'Godkendt', 'Nødløsning'][n - 1]}</small></span>`).join('')}</div>` : ''}<p>${esc(s.p)}</p><div class="intro__dots" aria-hidden="true">${INTRO.map((_, k) => `<i${k === i ? ' data-on' : ''}></i>`).join('')}</div><div class="intro__act">${i < INTRO.length - 1 ? `<button class="btn btn--quiet" type="button" data-intro-skip>Spring over</button><button class="btn btn--primary" type="button" data-intro-next>Næste</button>` : `<button class="btn btn--primary btn--wide" type="button" data-intro-skip>Kom i gang</button>`}</div></div>`; dlg.querySelector('[data-intro-next], [data-intro-skip]:last-child')?.focus(); };
+    dlg.addEventListener('click', (e) => { if (e.target.closest('[data-intro-next]')) { i++; draw(); } else if (e.target.closest('[data-intro-skip]')) dlg.close(); });
+    dlg.addEventListener('close', () => { db.introSet = true; save(); dlg.remove(); });
+    document.body.append(dlg); draw(); dlg.showModal(); dlg.querySelector('[data-intro-next]')?.focus();
+  }
+  main.addEventListener('input', (e) => { if (!e.target.matches('[data-helpsearch]')) return; const t = norm(e.target.value); let n = 0; main.querySelectorAll('.help-list > li').forEach((li) => { const hit = !t || t.split(' ').every((w) => li.dataset.q.includes(w) || li.dataset.q.includes(stem(w))); li.hidden = !hit; n += hit; }); document.getElementById('help-none').hidden = !!n; const first = main.querySelector('.help-list > li:not([hidden]) details'); if (t && n <= 2 && first) first.open = true; });
+
   // ---------- router ----------
   function render() {
     const raw = location.hash.replace(/^#\/?/, '') || 'indkob';
@@ -1033,6 +1076,7 @@
       case 'katalog': html = katalog(q); tab = 'katalog'; title = 'Katalog'; break;
       case 'mine': html = mine(q); tab = 'mine'; title = q.get('v') || 'Mine varer'; if (q.get('kat')) { db.mineKat = q.get('kat'); save(); } break;
       case 'profil': html = profil(); tab = 'profil'; title = 'Profil'; break;
+      case 'hjaelp': html = hjaelp(q); tab = 'hjaelp'; title = 'Hjælp'; break;
       case 'ny-opskrift': html = nyOpskrift(q); tab = 'retter'; title = 'Ny opskrift'; break;
       case 'lister': html = lister(); tab = 'indkob'; title = 'Faste lister'; break;
       case 'find-opskrifter': html = findOpskrifter(q); tab = 'retter'; title = 'Find opskrifter'; break;
@@ -1053,6 +1097,7 @@
     }
     clearTimeout(filmTimer);
     if (window.Scanner) Scanner.stop();
+    if (parts[0] !== 'indkob' && parts[0] !== '') qtyOpen = null;
     main.innerHTML = html;
     if (parts[0] === 'scan' && !q.get('ean')) startCamera(q.get('vare') || '');
     if (parts[0] === 'teknik') { filmGo(0, false); showOwn(parts[1]); }
@@ -1272,6 +1317,7 @@
       return;
     }
     if (e.target.closest('[data-sharepdf]') && window.__lastPdf) { navigator.share({ files: [window.__lastPdf], title: `Indkøb, ${weekLabel()}` }).catch(() => {}); return; }
+    if (e.target.closest('[data-intro]')) { showIntro(); return; }
     const ko = e.target.closest('[data-kost]');
     if (ko) { const pf = prof(); const k = ko.dataset.kost; pf.kost = (pf.kost || []).includes(k) ? pf.kost.filter((x) => x !== k) : [...(pf.kost || []), k]; save(); rerender(); main.querySelector(`[data-kost="${k}"]`)?.focus({ preventScroll: true }); return; }
     const al = e.target.closest('[data-allergi]');
@@ -1349,10 +1395,17 @@
     }
     const u = e.target.closest('[data-undo]');
     if (u && undo) { W().ticks[undo.v] = undo.t; const v = undo.v; undo = null; save(); rerender(); document.querySelector(`[data-tick="${CSS.escape(v)}"]`)?.focus(); return; }
+    const qo = e.target.closest('[data-qtyopen]');
+    if (qo) { qtyOpen = qtyOpen === qo.dataset.qtyopen ? null : qo.dataset.qtyopen; rerender(); (main.querySelector('.qtybar [aria-pressed="true"]') || main.querySelector(`[data-qtyopen="${CSS.escape(qo.dataset.qtyopen)}"]`))?.focus({ preventScroll: true }); return; }
+    const sq = e.target.closest('[data-setqty]');
+    if (sq) { const v = sq.dataset.vare; const n = +sq.dataset.setqty; W().extra ||= {}; W().qty ||= {};
+      if (n <= 0) { delete W().extra[v]; delete W().qty[v]; qtyOpen = null; } else { if (!onList(v)) W().extra[v] = true; W().qty[v] = n; if (sq.getAttribute('aria-label') === null) qtyOpen = null; }
+      save(); buzz(); rerender(); alertLine(n <= 0 ? `${v} er fjernet fra listen.` : `${v}: ${n}.`);
+      (main.querySelector('.qtybar [aria-pressed="true"]') || main.querySelector(`[data-qtyopen="${CSS.escape(v)}"]`))?.focus({ preventScroll: true }); return; }
     const t = e.target.closest('[data-tick]');
     if (t) {
       const v = t.dataset.tick;
-      if (W().ticks[v]) { undo = { v, t: W().ticks[v] }; W().ticks[v] = 0; } else { undo = null; learnRoute(v); W().ticks[v] = 1; buzz(); }
+      if (W().ticks[v]) { undo = { v, t: W().ticks[v] }; W().ticks[v] = 0; } else { undo = null; learnRoute(v); W().ticks[v] = +t.dataset.p || 1; buzz(); }
       save(); rerender(); document.querySelector(`[data-tick="${CSS.escape(v)}"]`)?.focus(); return;
     }
     const ph = e.target.closest('[data-photo]');
@@ -1491,6 +1544,9 @@
     Object.values(db.cards).forEach(fix); Object.values(db.weeks).forEach((w) => Object.values(w.cardOv || {}).forEach(fix));
   }
   mergeOwn(); relabel(); autofill(); save();
+  // the intro, once (tests run with ?intro=0)
+  if (!db.introSet && !/[?&]intro=0/.test(location.search) && !navigator.webdriver) setTimeout(showIntro, 300);
+  if (/[?&]intro=1/.test(location.search)) setTimeout(showIntro, 300);
   // offline and installable: only where the page is served over https (or localhost) from its own origin
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then((reg) => {

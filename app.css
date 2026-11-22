@@ -781,3 +781,46 @@ label.btn:has(input:focus-visible) { outline: 2px solid var(--color-focus); outl
 .scan__nut { display: flex; align-items: center; gap: var(--space-xs); color: var(--color-ink-2); }
 .weeknut { margin-bottom: var(--space-md); }
 .kostnote { margin-bottom: var(--space-sm); }
+/* Indkøb rows: quick quantity and swipe between prios */
+.group .row { grid-template-columns: auto minmax(0, 1fr) auto; }
+.row__open { touch-action: pan-y; transition: transform var(--dur-short) var(--ease-out); }
+.row__open.from-right { animation: from-right var(--dur-short) var(--ease-out); }
+.row__open.from-left { animation: from-left var(--dur-short) var(--ease-out); }
+@keyframes from-right { from { transform: translateX(24px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes from-left { from { transform: translateX(-24px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+.row__qty { min-width: 44px; height: 44px; padding: 0 var(--space-xs); border: 1px solid var(--color-rule); border-radius: var(--radius-pill); background: var(--color-paper); color: var(--color-ink); font: 800 var(--text-md)/1 var(--font-display); font-stretch: 75%; font-variant-numeric: tabular-nums; cursor: pointer; }
+.row__qty[aria-expanded="true"] { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-paper); }
+.row__qty:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.qtybar { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: var(--space-2xs); padding: 0 0 var(--space-sm); }
+.qtybar button { min-height: 44px; border: 1px solid var(--color-rule); border-radius: var(--radius-input); background: var(--color-paper-2); color: var(--color-ink); font: 600 var(--text-md)/1 var(--font-body); font-variant-numeric: tabular-nums; cursor: pointer; display: grid; place-items: center; }
+.qtybar button svg { width: 18px; height: 18px; }
+.qtybar button[aria-pressed="true"] { border: 2px solid var(--color-ink); background: var(--color-paper); font-weight: 800; }
+.qtybar button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.pdots { display: flex; gap: var(--space-2xs); margin-top: var(--space-3xs); }
+.pdots i { width: 16px; height: 4px; border-radius: 2px; background: var(--color-rule); font-size: 0; }
+.pdots i[data-on] { background: var(--color-ink); }
+@media (prefers-reduced-motion: reduce) { .row__open, .row__open.from-right, .row__open.from-left { animation: none; transition: none; } }
+/* help */
+.help-list { list-style: none; margin: var(--space-sm) 0 0; padding: 0 var(--space-sm); background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.help-list > li { border-bottom: 1px solid var(--color-rule); }
+.help-list > li:last-child { border-bottom: 0; }
+.help-list summary { display: flex; align-items: center; min-height: 52px; padding: var(--space-xs) 0; font-weight: 600; cursor: pointer; }
+.help-list summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.help-list details > p { margin-bottom: var(--space-sm); color: var(--color-ink-2); }
+/* intro */
+.intro { width: calc(100% - 2 * var(--space-md)); max-width: 26rem; padding: 0; border: 0; border-radius: var(--radius-card); background: var(--color-paper); color: var(--color-ink); box-shadow: var(--shadow-float); }
+.intro::backdrop { background: color-mix(in oklab, var(--color-night) 55%, transparent); }
+.intro__in { display: grid; gap: var(--space-md); padding: var(--space-lg); }
+.intro h2 { font-size: var(--text-2xl); font-stretch: 75%; }
+.intro__marks { display: flex; gap: var(--space-md); }
+.intro__marks span { display: grid; justify-items: center; gap: var(--space-2xs); }
+.intro__marks small { font-size: var(--text-sm); color: var(--color-ink-2); }
+.intro__dots { display: flex; gap: 6px; }
+.intro__dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--color-rule); }
+.intro__dots i[data-on] { background: var(--color-ink); }
+.intro__act { display: flex; justify-content: space-between; gap: var(--space-sm); }
+.row__open, .row__open img { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; }
+/* with the quantity button on the row, the price sits under the text so names get the width */
+.group .row__open:has(.row__price) { grid-template-columns: auto minmax(0, 1fr); }
+.group .row__open:not(:has(img.row__img)):has(.row__price) { grid-template-columns: minmax(0, 1fr); }
+.group .row__price { grid-column: -2; justify-self: start; font-size: var(--text-sm); }
