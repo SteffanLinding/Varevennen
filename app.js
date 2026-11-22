@@ -9,7 +9,7 @@
   const weekStart = (key) => { const [y, w] = key.split('-W').map(Number); const jan4 = new Date(Date.UTC(y, 0, 4)); const mon = new Date(jan4); mon.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1) + (w - 1) * 7); return mon; };
   const shiftWeek = (key, n) => { const d = weekStart(key); d.setUTCDate(d.getUTCDate() + 7 * n + 3); return isoWeek(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); };
   const weekNo = (key) => +key.split('-W')[1];
-  const weekRange = (key) => { const m = weekStart(key); const s2 = new Date(m); s2.setUTCDate(m.getUTCDate() + 6); const f = (d) => d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', timeZone: 'UTC' }); return `${f(m)} til ${f(s2)}`; };
+  const weekRange = (key) => { const m = weekStart(key); const s2 = new Date(m); s2.setUTCDate(m.getUTCDate() + 6); const f = (d) => d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', timeZone: 'UTC' }); return m.getUTCMonth() === s2.getUTCMonth() ? `${m.getUTCDate()}.\u2013${f(s2)}` : `${f(m)}\u2013${f(s2)}`; };
 
   // ---------- store ----------
   const blankWeek = () => ({ dishes: [], extra: {}, qty: {}, skip: {}, ticks: {}, cardOv: {} });
@@ -130,7 +130,7 @@
   const seenText = (st, shop) => st === 'ja' ? `Set i ${shop}` : st === 'nej' ? `Ikke set i ${shop}` : 'Butik ukendt';
   const thumb = (p, cls = 'thumb') => p && p.billede ? `<img class="${cls}" src="${esc(p.billede)}" alt="" width="400" height="400" loading="lazy">` : `<span class="${cls} ${cls}--none" aria-hidden="true"></span>`;
   const OFF_CREDIT = 'Produktdata og billeder: Open Food Facts-bidragydere (ODbL, CC BY-SA).';
-  const weekNav = () => `<div class="weeknav no-print" role="group" aria-label="Vælg uge"><button class="iconbtn" type="button" data-week="-1" aria-label="Uge ${weekNo(shiftWeek(db.week, -1))}">${icon.back}</button><p class="weeknav__lbl"><b>Uge ${weekNo(db.week)}</b><span class="meta">${db.week === CUR_WEEK ? 'Denne uge, ' : ''}${weekRange(db.week)}</span></p><button class="iconbtn" type="button" data-week="1" aria-label="Uge ${weekNo(shiftWeek(db.week, 1))}">${icon.fwd}</button>${db.week !== CUR_WEEK ? '<button class="btn btn--quiet btn--s" type="button" data-week="0">Denne uge</button>' : ''}</div>`;
+  const weekNav = () => `<div class="weeknav no-print" role="group" aria-label="Vælg uge"><button class="iconbtn" type="button" data-week="-1" aria-label="Uge ${weekNo(shiftWeek(db.week, -1))}">${icon.back}</button><p class="weeknav__lbl"><b>Uge ${weekNo(db.week)}</b><span class="meta">${weekRange(db.week)}</span></p><button class="iconbtn" type="button" data-week="1" aria-label="Uge ${weekNo(shiftWeek(db.week, 1))}">${icon.fwd}</button><button class="btn btn--quiet btn--s weeknav__now" type="button" data-week="0" aria-pressed="${db.week === CUR_WEEK}">${db.week === CUR_WEEK ? icon.check : ''}<span>Denne uge</span></button></div>`;
   const SLOT = ['p', 'ean', 'foto'];
   const clearSlot = (c, n) => SLOT.forEach((k) => { c[k + n] = ''; });
   const copySlot = (c, from, to) => SLOT.forEach((k) => { c[k + to] = c[k + from] || ''; });

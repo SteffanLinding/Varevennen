@@ -842,3 +842,10 @@ label.btn:has(input:focus-visible) { outline: 2px solid var(--color-focus); outl
 .intro__hint { text-align: center; }
 .intro { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 @media (prefers-reduced-motion: reduce) { .intro__in.from-right, .intro__in.from-left { animation: none; } }
+
+/* the week picker has the same four parts on every week: previous, label, next, "this week" */
+.weeknav { grid-template-columns: 44px minmax(0, 1fr) 44px auto; }
+.weeknav__now { width: 7.75rem; padding-inline: 0; justify-content: center; }
+.weeknav__now svg { width: 18px; height: 18px; }
+.weeknav__now[aria-pressed="true"] { border: 2px solid var(--color-ink); background: var(--color-paper); font-weight: 800; }
+@media (max-width: 22em) { .weeknav__now { width: 6.5rem; } .weeknav__now svg { display: none; } }
