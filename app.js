@@ -12,7 +12,7 @@
   const weekRange = (key) => { const m = weekStart(key); const s2 = new Date(m); s2.setUTCDate(m.getUTCDate() + 6); const f = (d) => d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', timeZone: 'UTC' }); return m.getUTCMonth() === s2.getUTCMonth() ? `${m.getUTCDate()}.\u2013${f(s2)}` : `${f(m)}\u2013${f(s2)}`; };
 
   // ---------- store ----------
-  const blankWeek = () => ({ dishes: [], extra: {}, qty: {}, skip: {}, ticks: {}, cardOv: {}, opt: {}, note: {} });
+  const blankWeek = () => ({ dishes: [], extra: {}, qty: {}, skip: {}, ticks: {}, cardOv: {}, opt: {}, note: {}, plan: {}, thawed: {} });
   const blank = () => ({
     v: 3,
     weeks: { [CUR_WEEK]: { ...blankWeek(), dishes: S.start.slice(), ticks: {} } },
@@ -60,7 +60,7 @@
     { id: 'gluten', navn: 'Gluten', varer: ['Hvedemel', 'Rasp', 'Pasta', 'Lasagneplader', 'Nudler', 'Tarteletter', 'Hotdogbrød', 'Pitabrød'], tags: /gluten|wheat|hvede|durum|rye|rug|barley|byg|oat|havre|spelt|小/i },
     { id: 'maelk', navn: 'Mælk', varer: ['Mælk', 'Smør', 'Revet ost'], tags: /milk|mælk|maelk|lactose|laktose|ost|whey|valle/i },
     { id: 'aeg', navn: 'Æg', varer: ['Æg'], tags: /egg|æg|aeg/i },
-    { id: 'fisk', navn: 'Fisk', varer: ['Fiskefilet'], tags: /fish|fisk/i },
+    { id: 'fisk', navn: 'Fisk', varer: ['Fiskefilet', 'Laks'], tags: /fish|fisk/i },
     { id: 'skaldyr', navn: 'Skaldyr og bløddyr', varer: [], tags: /crustacean|mollusc|skaldyr|rejer|shrimp/i },
     { id: 'noedder', navn: 'Nødder', varer: [], tags: /^nuts|tree-nut|nødder|hasselnød|mandel|almond|walnut|cashew/i },
     { id: 'jordnoedder', navn: 'Jordnødder', varer: [], tags: /peanut|jordnød/i },
@@ -93,6 +93,8 @@
   const filled = (v) => !!(card(v) && card(v).p1);
   const mark = (p, cls = '', label) => `<span class="mark ${cls}" data-p="${p}" ${label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"'}>${p === 0 ? '' : p === 'ok' ? icon.check : p === 'x' ? icon.cross : p === 'want' ? 1 : p}</span>`;
   const icon = {
+    dice: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.1" fill="currentColor" stroke="none"/></svg>',
+    bell: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>',
     pot: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 11h16a8 8 0 0 1-16 0Z"/><path d="M9 7c0-1.5 1-2 1-3.5M14 7c0-1.5 1-2 1-3.5"/></svg>',
     list: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.5" cy="6.5" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="17.5" r="1.2"/></svg>',
     search: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>',
@@ -374,6 +376,127 @@
   const kostNote = () => { const k = (nutOn() && db.profil.kost) || []; return k.length ? `<p class="meta kostnote">Viser kun: ${k.map((x) => KOST[x].toLowerCase()).join(', ')}. <a class="link" href="#/profil?vis=p-naering">Ret</a></p>` : ''; };
   const nutriBadge = (g) => g ? `<span class="nscore" data-g="${esc(g)}" title="Nutri-Score ${esc(g.toUpperCase())}">${esc(g.toUpperCase())}</span>` : '';
 
+  // ---------- plan the days, and remind about taking the meat out ----------
+  const DAYS = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'];
+  const TOEKOED = ['Hakket svinekød', 'Hakket oksekød', 'Kylling', 'Pølser', 'Fiskefilet', 'Svinekoteletter', 'Flæsk i skiver', 'Suppehøne', 'Laks', 'Flæskesteg', 'Kyllingespyd'];
+  const remCfg = () => ({ on: true, dag: 'foer', tid: '18:00', ...((db.profil && db.profil.paamind) || {}) });
+  const dayDate = (wk, idx) => { const m = weekStart(wk); return new Date(m.getUTCFullYear(), m.getUTCMonth(), m.getUTCDate() + idx); };
+  const shortDate = (wk, idx) => dayDate(wk, idx).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' });
+  const needOfW = (w, d) => (S.retter[d] || []).filter((v) => !blockOf(v) && !(w.skip && w.skip[d] && w.skip[d].includes(v)));
+  const meatOf = (w, d) => needOfW(w, d).filter((v) => TOEKOED.includes(v));
+  function remindAt(wk, idx) { const c = remCfg(); const [hh, mm] = c.tid.split(':').map(Number); const d = dayDate(wk, idx); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - (c.dag === 'foer' ? 1 : 0), hh || 0, mm || 0); }
+  const dayEnd = (wk, idx) => { const d = dayDate(wk, idx); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59); };
+  function dueReminders(now = new Date()) {
+    if (!remCfg().on) return [];
+    const out = [];
+    Object.entries(db.weeks).forEach(([wk, w]) => Object.entries(w.plan || {}).forEach(([dish, idx]) => {
+      if (!S.retter[dish] || !(w.dishes || []).includes(dish) || (w.thawed && w.thawed[dish])) return;
+      if (now < remindAt(wk, idx) || now > dayEnd(wk, idx)) return;
+      const meats = meatOf(w, dish); if (!meats.length) return;
+      out.push({ wk, dish, idx, meats, bought: meats.filter((v) => w.ticks && w.ticks[v] >= 1 && w.ticks[v] <= 3) });
+    }));
+    return out.sort((a, b) => a.idx - b.idx);
+  }
+  function whenWord(wk, idx, now = new Date()) { const d = dayDate(wk, idx); const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()); const diff = Math.round((d - t0) / 864e5); return diff === 0 ? 'i dag' : diff === 1 ? 'i morgen' : DAYS[idx].toLowerCase(); }
+  function thawBanner() {
+    const due = dueReminders(); if (!due.length) return '';
+    return `<section class="remind" role="region" aria-labelledby="rmh"><h2 id="rmh">${icon.bell}<span>Tag kødet op</span></h2><ul>${due.map((r) => { const notBought = r.meats.filter((v) => !r.bought.includes(v)); return `<li><div><b>${esc(r.meats.map(lower1).join(', '))}</b><span class="meta">til ${esc(r.dish)} ${esc(whenWord(r.wk, r.idx))}${notBought.length ? `. Ikke markeret som købt: ${esc(notBought.map(lower1).join(', '))}` : ''}</span></div><button class="btn btn--quiet btn--s" type="button" data-thawed="${esc(r.wk + '|' + r.dish)}">Taget op</button></li>`; }).join('')}</ul></section>`;
+  }
+  const dayOptions = (wk, cur) => `<option value="">Ingen dag</option>${DAYS.map((x, i) => { const d = dayDate(wk, i); return `<option value="${i}" ${cur === i ? 'selected' : ''}>${x} ${d.getDate()}/${d.getMonth() + 1}</option>`; }).join('')}`;
+  function freeDays() { const used = new Set(Object.values(W().plan || {})); const start = db.week === CUR_WEEK ? (new Date().getDay() + 6) % 7 : 0; const out = []; for (let i = start; i < 7; i++) if (!used.has(i)) out.push(i); return out; }
+  function autoPlan(names) { W().plan ||= {}; const free = freeDays(); names.filter((n) => W().plan[n] == null).forEach((n) => { if (free.length) W().plan[n] = free.shift(); }); }
+  function planBlock(sel) {
+    if (!sel.size) return '';
+    const any = [...sel].some((d) => W().plan && W().plan[d] != null);
+    return `<details class="plan no-print"${any ? ' open' : ''}><summary>Hvilken dag laver I hvad? <small>valgfrit</small></summary>
+      <p class="meta">Vælg en dag til hver ret, så kan appen minde jer om at tage kødet op.</p>
+      <ul class="plan__list">${[...sel].map((d) => `<li><label for="pl-${esc(slug(d))}">${esc(d)}</label><select class="input" id="pl-${esc(slug(d))}" data-plan="${esc(d)}">${dayOptions(db.week, W().plan ? W().plan[d] : undefined)}</select></li>`).join('')}</ul>
+      <div class="actions"><button class="btn btn--quiet" type="button" data-plan-auto>Fordel på dagene</button><button class="btn btn--quiet" type="button" data-ics>${icon.bell}<span>Påmindelser i kalenderen</span></button></div>
+      <p class="help" id="plan-help" aria-live="polite"></p></details>`;
+  }
+  const icsFold = (line) => { const enc = new TextEncoder(); let out = '', cur = '', bytes = 0; for (const ch of line) { const b = enc.encode(ch).length; if (bytes + b > 72) { out += cur + '\r\n '; cur = ''; bytes = 1; } cur += ch; bytes += b; } return out + cur; };
+  function icsText() {
+    const w = W(); const wk = db.week; const e2 = (t) => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    const f = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}00`;
+    const nowU = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+    const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Varevennen//DA', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH']; let n = 0;
+    Object.entries(w.plan || {}).forEach(([dish, idx]) => {
+      if (!(w.dishes || []).includes(dish)) return; const meats = meatOf(w, dish); if (!meats.length) return;
+      const at = remindAt(wk, idx); n++;
+      L.push('BEGIN:VEVENT', `UID:${wk}-${idx}-${n}@varevennen`, `DTSTAMP:${nowU}`, `DTSTART:${f(at)}`, `DTEND:${f(new Date(at.getTime() + 15 * 60000))}`, `SUMMARY:${e2('Tag kødet op: ' + meats.map(lower1).join(', '))}`, `DESCRIPTION:${e2(`Til ${dish} ${DAYS[idx].toLowerCase()}. Tag det op af fryseren, hvis I har købt det.`)}`, 'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${e2('Tag kødet op til ' + dish)}`, 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
+    });
+    L.push('END:VCALENDAR'); return { n, text: L.map(icsFold).join('\r\n') + '\r\n' };
+  }
+
+  // ---------- "Vælg en ret for mig" ----------
+  const SAESON_ORD = { vinter: 'vinteren', 'forår': 'foråret', sommer: 'sommeren', 'efterår': 'efteråret' };
+  const mins = (t) => { const x = String(t || ''); const h = /(\d+)\s*t/.exec(x); const m = /(\d+)\s*min/.exec(x); return (h ? +h[1] * 60 : 0) + (m ? +m[1] : 0) || null; };
+  const IKKE_AFTENSMAD = ['Rabarbergrød med fløde', 'Koldskål med kammerjunkere'];
+  const FILT = [['hurtig', 'Hurtig, under 30 min'], ['veg', 'Vegetar'], ['saeson', 'Passer til årstiden'], ['egne', 'Jeres egne'], ['nyt', 'Noget nyt']];
+  let chooser = { mode: 'en', f: new Set(), items: [], seen: new Set(), n: 5, added: {}, empty: false };
+  let prevRoute = '';
+  function dishPool() {
+    const out = [];
+    Object.keys(S.retter).forEach((n) => { const r = BANK.opskrifter[n] || null; const o = OP[n] || {}; out.push({ n, src: 'egen', r, tidTxt: o.tid || (r && r.tid) || '', tid: mins(o.tid || (r && r.tid)), ings: S.retter[n], saeson: (r && r.saeson) || [] }); });
+    Object.entries(BANK.opskrifter).forEach(([n, r]) => { if (!S.retter[n]) out.push({ n, src: 'nyt', r, tidTxt: r.tid, tid: mins(r.tid), ings: r.ing.map((x) => x[1]), saeson: r.saeson || [] }); });
+    return out;
+  }
+  const recentDishes = () => { const set = new Set(); Object.entries(db.weeks).filter(([k]) => weekStart(k) < weekStart(db.week)).sort((a, b) => weekStart(b[0]) - weekStart(a[0])).slice(0, 2).forEach(([, w]) => (w.dishes || []).forEach((d) => set.add(d))); return set; };
+  const hasHistory = () => Object.keys(db.weeks).some((k) => weekStart(k) < weekStart(db.week) && (db.weeks[k].dishes || []).length);
+  function eligible(d, f) {
+    if (W().dishes.includes(d.n)) return false;
+    if ((d.r && d.r.kategori === 'Bagning') || IKKE_AFTENSMAD.includes(d.n)) return false;   // baking and puddings are not dinner
+    if (d.ings.some((v) => blockOf(v))) return false;
+    if (!kostOk(d.n)) return false;
+    if (f.has('hurtig') && !(d.tid && d.tid <= 30)) return false;
+    if (f.has('veg') && d.ings.some((v) => TOEKOED.includes(v) || ['Kyllingenuggets', 'Frysepizza', 'Forårsruller'].includes(v))) return false;
+    if (f.has('saeson') && !d.saeson.includes(nowSeason())) return false;
+    if (f.has('egne') && d.src !== 'egen') return false;
+    if (f.has('nyt') && d.src !== 'nyt') return false;
+    return true;
+  }
+  const catOfDish = (d) => (d.r ? d.r.kategori : emneOf(d.n));
+  function pickDishes(count, exclude = new Set(), keep = []) {
+    const rec = recentDishes(); const pool = dishPool().filter((d) => eligible(d, chooser.f) && !exclude.has(d.n) && !keep.some((k) => k.n === d.n)); const out = [];
+    while (out.length < count && pool.length) {
+      const used = [...keep, ...out];
+      const w = pool.map((d) => { let x = 1; if (d.saeson.includes(nowSeason())) x *= 2; if (rec.has(d.n)) x *= 0.25; if (used.some((u) => u.ings[0] === d.ings[0])) x *= 0.15; if (used.some((u) => catOfDish(u) === catOfDish(d))) x *= 0.5; return x; });
+      let t = Math.random() * w.reduce((a, b) => a + b, 0); let i = 0; for (; i < pool.length - 1; i++) { t -= w[i]; if (t <= 0) break; }
+      out.push(pool[i]); pool.splice(i, 1);
+    }
+    return out;
+  }
+  function fillChooser() {
+    const c = chooser; c.added = {};
+    if (c.mode === 'en') { let r = pickDishes(1, c.seen); if (!r.length && c.seen.size) { c.seen.clear(); r = pickDishes(1, c.seen); } c.items = r; r.forEach((d) => c.seen.add(d.n)); }
+    else c.items = pickDishes(c.n);
+    c.empty = !c.items.length;
+  }
+  const whyOf = (d) => { const w = []; if (d.saeson.includes(nowSeason())) w.push(`Passer til ${SAESON_ORD[nowSeason()]}`); if (d.src === 'nyt') w.push('Ny for jer'); else if (hasHistory() && !recentDishes().has(d.n)) w.push('Ikke lavet for nylig'); if (d.tid && d.tid <= 30) w.push(`Klar på ${d.tid} min`); return w.slice(0, 3); };
+  const dishMeta = (d) => [d.tidTxt, pl(d.ings.length, 'ingrediens', 'ingredienser'), nutOn() && dishNut(d.n) ? `ca. ${dishNut(d.n).kcal} kcal` : ''].filter(Boolean).join(' · ');
+  const dishHref = (d) => (d.src === 'egen' ? `#/ret/${slug(d.n)}` : `#/bank/${slug(d.n)}`);
+  const dishPic = (d, cls) => { const im = d.r ? bankImg(d.r, d.n) : dishImg(d.n); return im ? `<img class="${cls}" src="${esc(im)}" alt="" width="600" height="450">` : `<span class="${cls} ${cls}--none" aria-hidden="true">${icon.pot}</span>`; };
+  function addDish(n) { if (BANK.opskrifter[n] && !S.retter[n]) takeRecipe(n); if (!W().dishes.includes(n)) W().dishes.push(n); }
+  function vaelgRet() {
+    const c = chooser; if (!c.items.length && !c.empty) fillChooser();
+    const head = `${back('#/retter', 'Retter')}<div class="screen-head"><h1 tabindex="-1">Vælg en ret for mig</h1><p class="lead">Appen vælger ud fra jeres allergier, årstiden og det, I ikke har lavet for nylig.</p></div>
+      <nav class="seg no-print" aria-label="Hvad skal jeg vælge?"><button type="button" data-vmode="en" ${c.mode === 'en' ? 'aria-current="page"' : ''}>En ret</button><button type="button" data-vmode="uge" ${c.mode === 'uge' ? 'aria-current="page"' : ''}>Hele ugen</button></nav>
+      <div class="chips chips--wrap pickf" role="group" aria-label="Hvad skal den være?">${FILT.map(([k, l]) => `<button type="button" class="chip" data-vf="${k}" aria-pressed="${c.f.has(k)}">${c.f.has(k) ? icon.check : ''}${esc(l)}</button>`).join('')}</div>`;
+    if (c.empty) return head + `<div class="empty"><h2>Ingen retter passer</h2><p class="lead">Fjern et af valgene ovenfor, så finder appen noget. Der er også ryddet for retter, I allerede har på listen i ${weekLabel()}.</p></div>`;
+    if (c.mode === 'en') {
+      const d = c.items[0]; const added = !!c.added[d.n]; const day = W().plan ? W().plan[d.n] : undefined;
+      return head + `<article class="pick"><a class="pick__pic" href="${dishHref(d)}" tabindex="-1" aria-hidden="true">${dishPic(d, 'pick__img')}</a><div class="pick__body"><h2 class="pick__name"><a href="${dishHref(d)}">${esc(d.n)}</a></h2><p class="meta">${esc(dishMeta(d))}</p><ul class="pick__why">${whyOf(d).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div></article>
+        ${added ? `<p class="pick__done" role="status">${icon.check}<span>${esc(d.n)} er på listen i ${weekLabel()}</span></p>
+          <p class="label" id="pdh">Hvilken dag? <small class="meta">valgfrit</small></p><div class="chips chips--wrap" role="group" aria-labelledby="pdh">${DAYS.map((x, i) => `<button type="button" class="chip" data-pickday="${i}" aria-pressed="${day === i}">${x.slice(0, 3)}</button>`).join('')}</div>
+          <div class="actions"><a class="btn btn--primary" href="#/indkob">Til listen</a><button class="btn btn--quiet" type="button" data-pick-again>Vælg en ret mere</button></div>`
+        : `<div class="actions"><button class="btn btn--primary" type="button" data-pick-add>Læg på listen i ${weekLabel()}</button><button class="btn btn--quiet" type="button" data-pick-again>${icon.dice}<span>Prøv en anden</span></button></div>`}`;
+    }
+    return head + `<ol class="pickweek">${c.items.map((d, i) => `<li><a class="pickweek__open" href="${dishHref(d)}">${dishPic(d, 'pickweek__img')}<span class="row__txt"><span class="row__name">${esc(d.n)}</span><span class="row__want">${esc(dishMeta(d))}</span></span></a><button class="iconbtn" type="button" data-pickswap="${i}" aria-label="Skift ${esc(d.n)} ud med en anden">${icon.dice}</button></li>`).join('')}</ol>
+      <div class="pickn no-print"><span class="label" id="pnh">Antal retter</span><span class="stepper" role="group" aria-labelledby="pnh"><button class="iconbtn" type="button" data-pickn="-1" aria-label="Færre retter" ${c.n <= 2 ? 'disabled' : ''}>${icon.minus}</button><output class="stepper__n">${c.n}</output><button class="iconbtn" type="button" data-pickn="1" aria-label="Flere retter" ${c.n >= 7 ? 'disabled' : ''}>${icon.plus}</button></span></div>
+      <div class="actions"><button class="btn btn--primary" type="button" data-pick-addall>Læg alle ${c.items.length} på listen i ${weekLabel()}</button><button class="btn btn--quiet" type="button" data-pick-again>${icon.dice}<span>Foreslå en ny uge</span></button></div>
+      <p class="meta">Retterne fordeles på dagene fra i dag, så appen kan minde jer om at tage kødet op. Det kan I ændre under Retter.</p>`;
+  }
+
   // ---------- recipe book: every dish sits in a chapter ----------
   const EMNE_STD = {
     'Boller i karry': 'Klassikere', 'Frikadeller med grøntsager og pasta': 'Klassikere', 'Karbonader med sovs og pasta': 'Klassikere', 'Stegt flæsk': 'Klassikere', 'Hønsekødssuppe': 'Klassikere', 'Tarteletter': 'Klassikere', 'Biksemad': 'Klassikere',
@@ -450,7 +573,7 @@
       <section class="summary" aria-label="Status for ${weekLabel()}"><p class="progress"><b>${done}</b><span class="meta">af ${pl(req.length, 'vare', 'varer')} fundet${missing ? `, ${missing} ikke fundet` : ''}${nOpt ? `, ${nOpt} kan undværes` : ''}</span></p>
       <div class="bar" role="progressbar" aria-label="Fundet" aria-valuemin="0" aria-valuemax="${req.length}" aria-valuenow="${done}" aria-valuetext="${done} af ${req.length} fundet"><span style="--p:${req.length ? done / req.length : 0}"></span></div>${items.length && priceSum(items).n ? `<p class="total"><span class="num">${sumLine(priceSum(items))}</span> <a class="link total__link" href="#/del?vis=priser">Hvor priserne kommer fra</a></p>` : ''}${shopSel}<p class="summary__more no-print"><a class="btn btn--quiet btn--s" href="#/overblik">${icon.list}<span>Overblik med pris og butik</span></a><a class="btn btn--quiet btn--s" href="#/lister">Faste lister</a><a class="btn btn--quiet btn--s" href="#/frisk">Er den frisk?</a></p></section>`;
     if (state === 'loading') return head.replace(/<b>\d+<\/b>/, '<b>0</b>').replace(/--p:[\d.]+/, '--p:0') + `<div aria-busy="true" aria-label="Henter listen">${'<span class="skel"><i></i><i></i></span>'.repeat(6)}</div>`;
-    if (state === 'empty' || !items.length) return `<div class="screen-head">${titleRow}${weekNav()}</div><div class="empty"><h2>Listen er tom${db.week !== CUR_WEEK ? ` for ${weekLabel()}` : ''}</h2><p class="lead">Vælg ugens retter, så bygger listen sig selv. Eller skriv en vare i feltet nederst.</p><div class="actions"><a class="btn btn--primary" href="#/retter">Vælg retter</a>${Object.keys(db.lister || {}).slice(0, 3).map((n) => `<button class="btn btn--quiet" type="button" data-loadlist="${esc(n)}">Brug ${esc(n)}</button>`).join('')}${Object.keys(db.lister || {}).length ? '' : '<a class="btn btn--quiet" href="#/lister">Lav en fast liste</a>'}</div></div>${composer()}`;
+    if (state === 'empty' || !items.length) return `<div class="screen-head">${titleRow}${weekNav()}</div><div class="empty"><h2>Listen er tom${db.week !== CUR_WEEK ? ` for ${weekLabel()}` : ''}</h2><p class="lead">Vælg ugens retter, så bygger listen sig selv. Eller skriv en vare i feltet nederst.</p><div class="actions"><a class="btn btn--primary" href="#/retter">Vælg retter</a><a class="btn btn--quiet" href="#/vaelg-ret">${icon.dice}<span>Vælg en ret for mig</span></a>${Object.keys(db.lister || {}).slice(0, 3).map((n) => `<button class="btn btn--quiet" type="button" data-loadlist="${esc(n)}">Brug ${esc(n)}</button>`).join('')}${Object.keys(db.lister || {}).length ? '' : '<a class="btn btn--quiet" href="#/lister">Lav en fast liste</a>'}</div></div>${composer()}`;
     const undoLine = undo ? `<p class="undo" role="status">${esc(undo.v)}: markering fjernet. <button class="link" type="button" data-undo>Fortryd</button></p>` : '';
     const err = state === 'offline' ? `<div class="notice" role="status"><p><b>Ingen forbindelse.</b> Dine flueben gemmes på telefonen og sendes, når der er net igen.</p></div>` : '';
     let groups = {};
@@ -482,7 +605,7 @@
     const LN = Object.keys(db.lister || {});
     const fixedRow = LN.length ? `<section class="habits no-print" aria-labelledby="flh"><h2 id="flh">Faste lister</h2><ul class="habits__list">${LN.map((n) => `<li><button type="button" class="habit" data-loadlist="${esc(n)}" aria-label="Hent ${esc(n)} ind i ${weekLabel()}">${icon.plus}<span>${esc(n)}${db.lister[n].butik ? ` <small>${esc(db.lister[n].butik)}</small>` : ''}</span></button></li>`).join('')}</ul></section>` : '';
     const habitRow = fixedRow + (hb.length ? `<section class="habits no-print" aria-labelledby="hbh"><h2 id="hbh">I plejer også at købe</h2><ul class="habits__list">${hb.map((v) => { const im = itemImg(v); return `<li><button type="button" class="habit" data-add="${esc(v)}" aria-label="Læg ${esc(v)} på listen">${im ? `<img src="${esc(im.src)}" alt="" width="40" height="40">` : ''}<span>${esc(v)}</span>${icon.plus}</button></li>`; }).join('')}</ul></section>` : '');
-    return head + habitRow + err + undoLine + rows + `<p class="visually-hidden" id="swipe-help">Brug piletasterne for at se prio 2 og 3.</p>` + composer();
+    return head + thawBanner() + habitRow + err + undoLine + rows + `<p class="visually-hidden" id="swipe-help">Brug piletasterne for at se prio 2 og 3.</p>` + composer();
   }
 
   function kort(v) {
@@ -605,7 +728,7 @@
     const img = dishImg(d);
     return `${back('#/retter', 'Retter')}
       ${img ? `<figure class="dish__hero"><img src="${esc(img)}" alt="${esc(d)}" width="500" height="375"></figure>` : ''}
-      <div class="screen-head"><h1 tabindex="-1">${esc(d)}</h1>${o ? `<div class="portions"><span class="label">Personer</span><span class="stepper" role="group" aria-label="Antal personer"><button class="iconbtn" type="button" data-port="-1" data-dish-name="${esc(d)}" aria-label="Færre personer" ${persons <= 1 ? 'disabled' : ''}>${icon.minus}</button><output class="stepper__n" aria-live="polite">${persons}</output><button class="iconbtn" type="button" data-port="1" data-dish-name="${esc(d)}" aria-label="Flere personer" ${persons >= 20 ? 'disabled' : ''}>${icon.plus}</button></span>${o.tid ? `<span class="meta">${esc(o.tid)}</span>` : ''}</div>` : ''}<div class="chaptersel no-print"><label for="emnesel">Kapitel</label><select class="input" id="emnesel" data-emne="${esc(d)}">${emner().map((e) => `<option ${emneOf(d) === e ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></div>${o ? `<p><a class="link" href="#/ny-opskrift?ret=${slug(d)}">${db.opskrifter && db.opskrifter[d] ? 'Ret opskriften' : 'Lav jeres egen udgave'}</a></p>` : ''}</div>
+      <div class="screen-head"><h1 tabindex="-1">${esc(d)}</h1>${o ? `<div class="portions"><span class="label">Personer</span><span class="stepper" role="group" aria-label="Antal personer"><button class="iconbtn" type="button" data-port="-1" data-dish-name="${esc(d)}" aria-label="Færre personer" ${persons <= 1 ? 'disabled' : ''}>${icon.minus}</button><output class="stepper__n" aria-live="polite">${persons}</output><button class="iconbtn" type="button" data-port="1" data-dish-name="${esc(d)}" aria-label="Flere personer" ${persons >= 20 ? 'disabled' : ''}>${icon.plus}</button></span>${o.tid ? `<span class="meta">${esc(o.tid)}</span>` : ''}</div>` : ''}${W().dishes.includes(d) ? `<div class="chaptersel no-print"><label for="daysel">Dag i ${weekLabel()}</label><select class="input" id="daysel" data-plan="${esc(d)}">${dayOptions(db.week, W().plan ? W().plan[d] : undefined)}</select></div>` : ''}<div class="chaptersel no-print"><label for="emnesel">Kapitel</label><select class="input" id="emnesel" data-emne="${esc(d)}">${emner().map((e) => `<option ${emneOf(d) === e ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></div>${o ? `<p><a class="link" href="#/ny-opskrift?ret=${slug(d)}">${db.opskrifter && db.opskrifter[d] ? 'Ret opskriften' : 'Lav jeres egen udgave'}</a></p>` : ''}</div>
       <p class="photo-row no-print">${photoPick('dish', d, 0, !!(db.dishFoto && db.dishFoto[d]), 'Eget foto af retten')}</p>
       ${nutOn() && dishNut(d) ? `<section class="section" aria-label="Næring">${nutBlock(dishNut(d))}</section>` : ''}
       <section class="section" aria-labelledby="ing"><h2 id="ing">Det skal I bruge</h2><p class="meta">Fjern fluebenet ved det, I har hjemme. Træk mærkerne for at bytte om i ${weekLabel()}.</p>
@@ -653,9 +776,10 @@
     const em = q && q.get('emne'); const chapters = emner();
     const names = Object.keys(S.retter).filter((d) => (!em || emneOf(d) === em) && (kostOk(d) || sel.has(d))).sort((a, b) => (chapters.indexOf(emneOf(a)) - chapters.indexOf(emneOf(b))) || (S.start.includes(b) - S.start.includes(a)) || a.localeCompare(b, 'da'));
     const bookNav = `<nav class="chips chips--scroll booknav" aria-label="Kapitler i opskriftsbogen"><a class="chip" data-replace href="#/retter" ${!em ? 'aria-current="true"' : ''}>Alle <small>${Object.keys(S.retter).length}</small></a>${chapters.map((e) => `<a class="chip" data-replace href="#/retter?emne=${slug(e)}" ${em === e ? 'aria-current="true"' : ''}>${esc(e)} <small>${Object.keys(S.retter).filter((d) => emneOf(d) === e).length}</small></a>`).join('')}</nav>`;
-    return `${segNav('uge')}<div class="screen-head"><h1 tabindex="-1">Hvad skal vi spise i ${weekLabel()}?</h1>${weekNav()}<p class="lead">Sæt flueben ved ugens retter. Tryk på en ret for at se opskriften og vælge, hvad der skal købes.</p><p class="retter__links"><a class="howto" href="#/kogebog">${icon.search}Find flere retter</a><a class="howto" href="#/ny-opskrift">${icon.plus}Skriv jeres egen</a><a class="howto" href="#/teknikker">${icon.play}Sådan gør du</a></p></div>
+    return `${thawBanner()}${segNav('uge')}<div class="screen-head"><h1 tabindex="-1">Hvad skal vi spise i ${weekLabel()}?</h1>${weekNav()}<p class="lead">Sæt flueben ved ugens retter. Tryk på en ret for at se opskriften og vælge, hvad der skal købes.</p><p class="retter__links"><a class="howto" href="#/vaelg-ret">${icon.dice}Vælg en ret for mig</a><a class="howto" href="#/kogebog">${icon.search}Find flere retter</a><a class="howto" href="#/ny-opskrift">${icon.plus}Skriv jeres egen</a><a class="howto" href="#/teknikker">${icon.play}Sådan gør du</a></p></div>
       ${nutOn() ? (() => { const ns = [...sel].map(dishNut).filter((x) => x && x.kcal); if (!ns.length) return ''; const avg = (k) => Math.round(ns.reduce((a, x) => a + x[k], 0) / ns.length); return `<section class="summary weeknut" aria-label="Ugens aftensmad"><p class="progress"><b>ca. ${avg('kcal')}</b><span class="meta">kcal pr. person i gennemsnit for ${pl(ns.length, 'ret', 'retter')} i ${weekLabel()}</span></p><p class="meta">${avg('protein')} g protein, ${avg('kulh')} g kulhydrat og ${avg('fedt')} g fedt pr. portion. Regnet ud fra opskrifterne, ikke fra hvad I har spist.</p></section>`; })() : ''}
-      ${bookNav}<fieldset><legend class="visually-hidden">Retter</legend><ul class="dishes">${names.map((d, i) => (i === 0 || emneOf(names[i - 1]) !== emneOf(d) ? `<li class="chapter"><h2>${esc(emneOf(d))}</h2></li>` : '') + `<li><input type="checkbox" id="d${i}" data-dish="${esc(d)}" ${sel.has(d) ? 'checked' : ''} aria-label="Vælg ${esc(d)} til ${weekLabel()}"><label for="d${i}" class="dish__tick"><span class="box" aria-hidden="true">${icon.check}</span></label><a class="dish__open" href="#/ret/${slug(d)}">${dishImg(d) ? `<img class="dish__img" src="${esc(dishImg(d))}" alt="" width="500" height="375" loading="lazy">` : '<span class="dish__img dish__img--none" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(d)}</span><span class="row__want">${nutOn() && dishNut(d) ? `ca. ${dishNut(d).kcal} kcal, ` : ''}${pl(needOf(d).length, 'vare', 'varer')}${needOf(d).length < S.retter[d].length ? ` (${S.retter[d].length - needOf(d).length} har I)` : ''}${S.start.includes(d) ? ', startret' : ''}${db.dishFoto && db.dishFoto[d] ? ', eget foto' : ''}</span></span></a><label class="iconbtn dish__cam" title="Eget foto">${icon.camera}<input type="file" accept="image/*" class="visually-hidden" data-photo="dish" data-key="${esc(d)}" data-n="0" aria-label="Eget foto af ${esc(d)}"></label></li>`).join('')}</ul></fieldset>
+      ${planBlock(sel)}
+      ${bookNav}<fieldset><legend class="visually-hidden">Retter</legend><ul class="dishes">${names.map((d, i) => (i === 0 || emneOf(names[i - 1]) !== emneOf(d) ? `<li class="chapter"><h2>${esc(emneOf(d))}</h2></li>` : '') + `<li><input type="checkbox" id="d${i}" data-dish="${esc(d)}" ${sel.has(d) ? 'checked' : ''} aria-label="Vælg ${esc(d)} til ${weekLabel()}"><label for="d${i}" class="dish__tick"><span class="box" aria-hidden="true">${icon.check}</span></label><a class="dish__open" href="#/ret/${slug(d)}">${dishImg(d) ? `<img class="dish__img" src="${esc(dishImg(d))}" alt="" width="500" height="375" loading="lazy">` : '<span class="dish__img dish__img--none" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(d)}</span><span class="row__want">${sel.has(d) && W().plan && W().plan[d] != null ? `<b>${DAYS[W().plan[d]]}</b>, ` : ''}${nutOn() && dishNut(d) ? `ca. ${dishNut(d).kcal} kcal, ` : ''}${pl(needOf(d).length, 'vare', 'varer')}${needOf(d).length < S.retter[d].length ? ` (${S.retter[d].length - needOf(d).length} har I)` : ''}${S.start.includes(d) ? ', startret' : ''}${db.dishFoto && db.dishFoto[d] ? ', eget foto' : ''}</span></span></a><label class="iconbtn dish__cam" title="Eget foto">${icon.camera}<input type="file" accept="image/*" class="visually-hidden" data-photo="dish" data-key="${esc(d)}" data-n="0" aria-label="Eget foto af ${esc(d)}"></label></li>`).join('')}</ul></fieldset>
       ${Object.keys(RB).length ? `<details class="credits"><summary>Fotokreditering</summary><ul>${names.filter((d) => RB[d] && !(db.dishFoto && db.dishFoto[d])).map((d) => `<li>${esc(d)}: ${esc(RB[d].credit)}</li>`).join('')}</ul></details>` : ''}
       <div class="dock"><div class="dock__in"><button class="btn btn--primary" type="button" id="build" ${sel.size ? '' : 'disabled'}>Byg listen, ${pl(n, 'vare', 'varer')}</button></div></div>`;
   }
@@ -838,7 +962,7 @@
     const withData = Object.values(PR).flat().filter((p) => (p.allergener || []).length || (p.spor || []).length).length;
     const allP = Object.values(PR).flat().length;
     return `<div class="screen-head"><h1 tabindex="-1">Profil og indstillinger</h1><p class="lead">Det her gælder hele husstanden, og det gemmes på telefonen.</p></div>
-      <nav class="toc" aria-label="På siden"><a class="chip" href="#/profil?vis=p-allergi" data-replace>Allergier</a><a class="chip" href="#/profil?vis=p-aldrig" data-replace>Varer I aldrig køber</a><a class="chip" href="#/profil?vis=p-butik" data-replace>Butik</a><a class="chip" href="#/profil?vis=p-naering" data-replace>Næring</a><a class="chip" href="#/profil?vis=p-data" data-replace>Data</a><a class="chip" href="#/hjaelp">Hjælp</a><a class="chip" href="#/profil?vis=p-varer" data-replace>Jeres varer</a><a class="chip" href="#/teknikker">Sådan gør du</a></nav>
+      <nav class="toc" aria-label="På siden"><a class="chip" href="#/profil?vis=p-allergi" data-replace>Allergier</a><a class="chip" href="#/profil?vis=p-aldrig" data-replace>Varer I aldrig køber</a><a class="chip" href="#/profil?vis=p-butik" data-replace>Butik</a><a class="chip" href="#/profil?vis=p-naering" data-replace>Næring</a><a class="chip" href="#/profil?vis=p-paamind" data-replace>Påmindelser</a><a class="chip" href="#/profil?vis=p-data" data-replace>Data</a><a class="chip" href="#/hjaelp">Hjælp</a><a class="chip" href="#/profil?vis=p-varer" data-replace>Jeres varer</a><a class="chip" href="#/teknikker">Sådan gør du</a></nav>
       <section class="section" id="p-allergi" aria-labelledby="pa"><h2 id="pa">Allergier</h2>
         <p class="meta">Varer, der selv er allergenet, tages af listen, fx æg ved æggeallergi. Produkter, der indeholder det eller kan have spor af det, skjules i forslag og når I vælger produkt.</p>
         <div class="chips chips--wrap" role="group" aria-label="Allergier">${ALLERGENER.map((a) => `<button type="button" class="chip" data-allergi="${a.id}" aria-pressed="${pf.allergi.includes(a.id)}">${pf.allergi.includes(a.id) ? icon.check : ''}${esc(a.navn)}</button>`).join('')}</div>
@@ -853,6 +977,10 @@
       <section class="section" id="p-naering" aria-labelledby="pn2"><h2 id="pn2">Næring</h2>
         <div class="choice choice--inline"><input type="checkbox" id="nutsw" data-nutsw ${nutOn() ? 'checked' : ''}><label for="nutsw">Vis næring og kalorier<small>På varekort, retter, opskrifter og når I scanner. Ingen dagbog, ingen mål.</small></label></div>
         ${nutOn() ? `<p class="label" id="kosth" style="margin-top: var(--space-md)">Jeres kost</p><div class="chips chips--wrap" role="group" aria-labelledby="kosth">${Object.entries(KOST).map(([k, l]) => `<button type="button" class="chip" data-kost="${k}" aria-pressed="${(db.profil.kost || []).includes(k)}">${(db.profil.kost || []).includes(k) ? icon.check : ''}${esc(l)}</button>`).join('')}</div><p class="meta">Kogebogen viser kun retter, der passer. Kalorier er regnet ud fra opskrifternes mængder og produkternes tal, så de er et skøn.</p>` : ''}</section>
+      <section class="section" id="p-paamind" aria-labelledby="pp"><h2 id="pp">Påmindelser</h2>
+        <div class="choice choice--inline"><input type="checkbox" id="remsw" data-remsw ${remCfg().on ? 'checked' : ''}><label for="remsw">Mind mig om at tage kødet op<small>Når en ret med kød har fået en dag under Retter. Vises øverst på Indkøb og Retter.</small></label></div>
+        ${remCfg().on ? `<div class="split"><div class="field"><label for="remdag">Hvornår</label><select class="input" id="remdag" data-remdag><option value="foer" ${remCfg().dag === 'foer' ? 'selected' : ''}>Dagen før</option><option value="samme" ${remCfg().dag === 'samme' ? 'selected' : ''}>Samme dag</option></select></div><div class="field"><label for="remtid">Klokken</label><input class="input" type="time" id="remtid" data-remtid value="${esc(remCfg().tid)}"></div></div>` : ''}
+        <p class="meta">En app kan ikke selv ringe, når den er lukket. Under Retter kan I lægge påmindelserne i telefonens kalender, så får I en rigtig alarm.</p></section>
       <section class="section" id="p-data" aria-labelledby="pd"><h2 id="pd">Jeres data</h2>
         <p class="meta">Alt ligger kun på denne telefon. Tag en kopi, så I ikke mister varekort, lister og opskrifter, eller send kopien til den anden telefon og hent den ind der.</p>
         <div class="actions"><button class="btn btn--quiet" type="button" data-export>Gem en kopi</button><label class="btn btn--quiet">Hent en kopi ind<input type="file" accept="application/json,.json" class="visually-hidden" data-import></label></div>
@@ -956,14 +1084,14 @@
   const nowSeason = () => { const m = new Date().getMonth() + 1; return Object.keys(SAESONER).find((k) => SAESONER[k].includes(m)) || 'efterår'; };
   const segNav = (on) => `<nav class="seg no-print" aria-label="Retter og kogebog"><a href="#/retter" ${on === 'uge' ? 'aria-current="page"' : ''}>Ugens retter</a><a href="#/kogebog" ${on === 'bog' ? 'aria-current="page"' : ''}>Kogebog</a></nav>`;
   const rcard = (n, r) => { if (!kostOk(n)) return ''; const mine = !!S.retter[n]; const im = r ? bankImg(r, n) : dishImg(n); const href = mine ? `#/ret/${slug(n)}` : `#/bank/${slug(n)}`;
-    return `<li class="rcard" data-q="${esc(norm(n + ' ' + (r ? r.ing.map((x) => x[1]).join(' ') : (S.retter[n] || []).join(' '))))}"><a href="${href}">${im ? `<img class="rcard__img" src="${esc(im)}" alt="" width="600" height="450" loading="lazy">` : `<span class="rcard__img rcard__img--none" aria-hidden="true">${icon.pot}</span>`}<span class="rcard__name">${esc(n)}</span><span class="rcard__meta">${r ? esc(r.tid) : pl((S.retter[n] || []).length, 'vare', 'varer')}${nutOn() && dishNut(n) ? ` · ca. ${dishNut(n).kcal} kcal` : ''}${mine ? ' · <span class="badge">I kogebogen</span>' : ''}</span></a></li>`; };
+    return `<li class="rcard" data-q="${esc(norm(n + ' ' + (r ? r.ing.map((x) => x[1]).join(' ') : (S.retter[n] || []).join(' '))))}"><a href="${href}">${im ? `<img class="rcard__img" src="${esc(im)}" alt="" width="600" height="450" loading="lazy">` : `<span class="rcard__img rcard__img--none" aria-hidden="true">${icon.pot}</span>`}<span class="rcard__name">${esc(n)}</span><span class="rcard__meta">${r ? esc(r.tid) : pl((S.retter[n] || []).length, 'vare', 'varer')}${nutOn() && dishNut(n) ? ` · ca. ${dishNut(n).kcal} kcal` : ''}${mine ? ' · <span class="badge">Gemt</span>' : ''}</span></a></li>`; };
   function kogebog(q) {
     const sz = q.get('saeson'); const now = nowSeason();
     const bank = Object.entries(BANK.opskrifter);
     const shelf = (title, items, more) => (items = items.filter(Boolean)).length ? `<section class="shelf" aria-labelledby="sh-${esc(slug(title))}"><div class="shelf__head"><h2 id="sh-${esc(slug(title))}">${title}</h2>${more ? `<a class="link" href="${more}">Se alle</a>` : ''}</div><ul class="shelf__row">${items.join('')}</ul></section>` : '';
     const search = `<div class="field minesearch"><label class="visually-hidden" for="bogsq">Søg efter ret eller ingrediens</label><span class="composer__field">${icon.search}<input id="bogsq" type="search" placeholder="Søg på ret eller ingrediens, fx laks" autocomplete="off" data-bogsearch></span></div>`;
     const seasonChips = `<nav class="chips chips--scroll booknav" aria-label="Årstider">${Object.keys(SAESONER).map((k) => `<a class="chip" data-replace href="#/kogebog?saeson=${slug(k)}" ${sz === k ? 'aria-current="true"' : ''}>${k.charAt(0).toUpperCase() + k.slice(1)}${k === now ? ' <small>nu</small>' : ''}</a>`).join('')}</nav>`;
-    const head = `${segNav('bog')}<div class="screen-head"><h1 tabindex="-1">Kogebog</h1><p class="lead">Gå på opdagelse. Læg det, I kan lide, i jeres egen kogebog, og ret det til på jeres måde.</p></div>${search}${seasonChips}${kostNote()}`;
+    const head = `${segNav('bog')}<div class="screen-head"><h1 tabindex="-1">Kogebog</h1><p class="lead">Gå på opdagelse. Gem det, I kan lide, og ret det til på jeres måde.</p><p><a class="howto" href="#/vaelg-ret">${icon.dice}Vælg en ret for mig</a></p></div>${search}${seasonChips}${kostNote()}`;
     const results = `<ul class="rgrid" id="bogresults" hidden>${[...Object.keys(S.retter).filter((d) => !BANK.opskrifter[d]).map((d) => rcard(d, null)), ...bank.map(([n, r]) => rcard(n, r))].join('')}</ul><p class="meta" id="bog-none" hidden>Ingen retter passer. Prøv en ingrediens, fx kylling.</p>`;
     if (sz && SAESONER[sz]) {
       const list = bank.filter(([, r]) => (r.saeson || []).includes(sz));
@@ -973,7 +1101,7 @@
     const credits = bank.filter(([n]) => BB[n]).map(([n]) => `<li>${esc(n)}: ${esc(BB[n].credit)}</li>`).join('');
     return head + results + `<div id="bogshelves">
       ${shelf(`Lige nu: ${now}`, bank.filter(([, r]) => (r.saeson || []).includes(now)).map(([n, r]) => rcard(n, r)), `#/kogebog?saeson=${slug(now)}`)}
-      ${shelf('Jeres kogebog', own.map((d) => rcard(d, BANK.opskrifter[d] || null)), '#/retter')}
+      ${shelf('Gemte retter', own.map((d) => rcard(d, BANK.opskrifter[d] || null)), '#/retter')}
       ${BANK.kategorier.map((k) => shelf(esc(k), bank.filter(([, r]) => r.kategori === k).map(([n, r]) => rcard(n, r)), `#/find-opskrifter?kat=${slug(k)}`)).join('')}
       <p class="section"><a class="btn btn--quiet" href="#/ny-opskrift">${icon.plus}<span>Skriv jeres egen opskrift</span></a></p>
       ${credits ? `<details class="credits"><summary>Fotokreditering</summary><ul>${credits}</ul></details>` : ''}</div>`;
@@ -987,9 +1115,9 @@
   function findOpskrifter(q) {
     const kat = BANK.kategorier.includes(q.get('kat')) ? q.get('kat') : BANK.kategorier[0];
     const list = Object.entries(BANK.opskrifter).filter(([n, r]) => r.kategori === kat && kostOk(n));
-    return `${back('#/retter', 'Retter')}<div class="screen-head"><h1 tabindex="-1">Find opskrifter</h1><p class="lead">Almindelige opskrifter i kategorier. Læg dem i jeres kogebog, så kan I rette dem til jeres egen måde.</p></div>
+    return `${back('#/retter', 'Retter')}<div class="screen-head"><h1 tabindex="-1">Find opskrifter</h1><p class="lead">Almindelige opskrifter i kategorier. Gem dem, så kan I rette dem til jeres egen måde.</p></div>
       <nav class="chips chips--scroll booknav" aria-label="Kategorier">${BANK.kategorier.map((k) => `<a class="chip" data-replace href="#/find-opskrifter?kat=${slug(k)}" ${k === kat ? 'aria-current="true"' : ''}>${esc(k)}</a>`).join('')}</nav>
-      <ul class="bank">${list.map(([n, r]) => { const im = bankImg(r); const has = !!(db.opskrifter && db.opskrifter[n]); return `<li class="bank__card"><a class="bank__open" href="#/bank/${slug(n)}">${im ? `<img class="bank__img" src="${esc(im)}" alt="" width="400" height="400" loading="lazy">` : `<span class="bank__img bank__img--none" aria-hidden="true">${icon.pot}</span>`}<span class="row__txt"><span class="row__name">${esc(n)}</span><span class="row__want">${esc(r.tid)}, ${pl(r.ing.length, 'ingrediens', 'ingredienser')}</span></span></a>${has ? `<span class="badge bank__has">I kogebogen</span>` : `<button class="btn btn--quiet btn--s" type="button" data-take="${esc(n)}">${icon.plus}<span>Kogebog</span></button>`}</li>`; }).join('')}</ul>`;
+      <ul class="bank">${list.map(([n, r]) => { const im = bankImg(r); const has = !!(db.opskrifter && db.opskrifter[n]); return `<li class="bank__card"><a class="bank__open" href="#/bank/${slug(n)}">${im ? `<img class="bank__img" src="${esc(im)}" alt="" width="400" height="400" loading="lazy">` : `<span class="bank__img bank__img--none" aria-hidden="true">${icon.pot}</span>`}<span class="row__txt"><span class="row__name">${esc(n)}</span><span class="row__want">${esc(r.tid)}, ${pl(r.ing.length, 'ingrediens', 'ingredienser')}</span></span></a>${has ? `<span class="badge bank__has">Gemt</span>` : `<button class="btn btn--quiet btn--s" type="button" data-take="${esc(n)}" aria-label="Gem ${esc(n)}">${icon.plus}<span>Gem</span></button>`}</li>`; }).join('')}</ul>`;
   }
   function bankRet(n) {
     const r = BANK.opskrifter[n];
@@ -998,7 +1126,7 @@
     return `${back('#/kogebog', 'Kogebog')}${BB[n] ? `<figure class="dish__hero"><img src="${esc(BB[n].src)}" alt="${esc(n)}" width="600" height="450"></figure>` : ''}<div class="screen-head"><h1 tabindex="-1">${esc(n)}</h1><p class="meta">${esc(r.kategori)}, ${esc(r.tid)}, til 4 personer${(r.saeson || []).length ? `, ${esc(r.saeson.join(' og '))}` : ''}</p></div>
       <section class="section" aria-labelledby="bi"><h2 id="bi">Det skal I bruge</h2><ul class="pvarer minelist">${r.ing.map(([a, v]) => { const im = itemImg(v); return `<li class="lrow">${im ? `<img class="row__img" src="${esc(im.src)}" alt="" width="400" height="400" loading="lazy">` : '<span class="row__img row__img--blank" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(v)}</span><span class="row__want">${esc(a)}</span></span></li>`; }).join('')}</ul><p class="meta">Fra skabet: salt, peber og olie.</p>${nutOn() ? `<h3 class="nutri__h">Næring</h3>${nutBlock(dishNut(n))}` : ''}</section>${BB[n] ? `<p class="credit section">Foto: ${esc(BB[n].credit)}</p>` : ''}
       <section class="section" aria-labelledby="bs"><h2 id="bs">Sådan gør I</h2><ol class="steps">${r.trin.map((t) => { const hit = Object.entries(TK).filter(([, x]) => x.match && x.match.test(t)).slice(0, 3); return `<li><span>${esc(t)}</span>${hit.length ? `<span class="howtos">${hit.map(([id, x]) => `<a class="howto" href="#/teknik/${id}">${icon.play}${esc(x.navn)}</a>`).join('')}</span>` : ''}</li>`; }).join('')}</ol></section>
-      <div class="dock no-print"><div class="dock__in">${has ? `<a class="btn btn--primary" href="#/ret/${slug(n)}">Åbn i kogebogen</a>` : `<button class="btn btn--primary" type="button" data-take="${esc(n)}" data-then="ret">Læg i kogebogen</button><button class="btn btn--quiet" type="button" data-take="${esc(n)}" data-then="uge">På listen i ${weekLabel()}</button>`}</div></div>`;
+      <div class="dock no-print"><div class="dock__in">${W().dishes.includes(n) ? `<a class="btn btn--primary" href="#/indkob">${icon.check}<span>På listen i ${weekLabel()}</span></a><a class="btn btn--quiet" href="#/ret/${slug(n)}">Åbn opskriften</a>` : has ? `<button class="btn btn--primary" type="button" data-take="${esc(n)}" data-then="uge">Læg på listen i ${weekLabel()}</button><a class="btn btn--quiet" href="#/ret/${slug(n)}">Åbn opskriften</a>` : `<button class="btn btn--primary" type="button" data-take="${esc(n)}" data-then="uge">Læg på listen i ${weekLabel()}</button><button class="btn btn--quiet" type="button" data-take="${esc(n)}">Gem til senere</button>`}</div></div>`;
   }
 
   // fixed lists: the things the household always buys, often in one store
@@ -1098,6 +1226,8 @@
     setStatus('');
     let html, tab = 'indkob', title = 'Indkøb';
     document.body.classList.remove('has-dock');
+    if (parts[0] === 'vaelg-ret' && prevRoute !== 'vaelg-ret') { chooser.items = []; chooser.empty = false; chooser.seen = new Set(); chooser.added = {}; if (q.get('mode') === 'uge' || q.get('mode') === 'en') chooser.mode = q.get('mode'); }
+    prevRoute = parts[0];
     switch (parts[0]) {
       case 'ret': html = ret(parts[1]); tab = 'retter'; title = parts[1]; document.body.classList.add('has-dock'); break;
       case 'retter': html = retter(q); tab = 'retter'; title = 'Retter'; document.body.classList.add('has-dock'); break;
@@ -1110,6 +1240,7 @@
       case 'lister': html = lister(); tab = 'indkob'; title = 'Faste lister'; break;
       case 'find-opskrifter': html = findOpskrifter(q); tab = 'retter'; title = 'Find opskrifter'; break;
       case 'kogebog': html = kogebog(q); tab = 'retter'; title = 'Kogebog'; break;
+      case 'vaelg-ret': html = vaelgRet(); tab = 'retter'; title = 'Vælg en ret for mig'; break;
       case 'bank': html = bankRet(parts[1]); tab = 'retter'; title = parts[1]; document.body.classList.add('has-dock'); break;
       case 'liste': html = liste(parts[1]); tab = 'indkob'; title = parts[1]; break;
       case 'overblik': html = overblik(); tab = 'indkob'; title = 'Overblik'; break;
@@ -1254,6 +1385,10 @@
     document.getElementById('fr-none').hidden = !!n;
   });
   main.addEventListener('change', async (e) => {
+    if (e.target.matches('[data-plan]')) { const d = e.target.dataset.plan; W().plan ||= {}; if (e.target.value === '') delete W().plan[d]; else W().plan[d] = +e.target.value; save(); rerender(); return; }
+    if (e.target.matches('[data-remsw]')) { db.profil ||= {}; db.profil.paamind = { ...remCfg(), on: e.target.checked }; save(); rerender(); document.getElementById('remsw')?.focus({ preventScroll: true }); return; }
+    if (e.target.matches('[data-remdag]')) { db.profil ||= {}; db.profil.paamind = { ...remCfg(), dag: e.target.value, tid: e.target.value === 'samme' && remCfg().tid >= '12:00' ? '07:00' : e.target.value === 'foer' && remCfg().tid < '12:00' ? '18:00' : remCfg().tid }; save(); rerender(); return; }
+    if (e.target.matches('[data-remtid]')) { if (!e.target.value) return; db.profil ||= {}; db.profil.paamind = { ...remCfg(), tid: e.target.value }; save(); toast(`Påmindelsen kommer kl. ${e.target.value}.`); return; }
     if (e.target.matches('[data-note]')) {
       const v = e.target.dataset.note; const val = e.target.value.trim(); W().note ||= {}; if (val) W().note[v] = val; else delete W().note[v]; save();
       const li = e.target.closest('.row'); if (li) { let el = li.querySelector('.row__note'); if (val) { if (!el) { el = document.createElement('span'); el.className = 'row__note'; li.querySelector('.row__txt').append(el); } el.textContent = val; } else el?.remove(); }
@@ -1333,7 +1468,7 @@
     if (ssw) { const v = ssw.dataset.vare; const p = byEan[ssw.dataset.stdswap]; const c = (db.cards[v] ||= { rule: 'naermeste' }); placeAt(c, 1, p); delete c.auto; save(); buzz(); rerender(); toast(`${prodLabel(p)} er nu prio 1.`); return; }
     const tk = e.target.closest('[data-take]');
     if (tk) { const n = tk.dataset.take; takeRecipe(n); if (tk.dataset.then === 'uge' && !W().dishes.includes(n)) W().dishes.push(n); save(); buzz();
-      if (tk.dataset.then === 'ret') location.hash = `#/ret/${slug(n)}`; else if (tk.dataset.then === 'uge') { location.hash = '#/indkob'; setTimeout(() => toast(`${n} er i kogebogen og på listen.`), 50); } else { rerender(); toast(`${n} er lagt i kogebogen under ${BANK.opskrifter[n].kategori}.`); }
+      if (tk.dataset.then === 'ret') location.hash = `#/ret/${slug(n)}`; else if (tk.dataset.then === 'uge') { location.hash = '#/indkob'; setTimeout(() => toast(`${n} er på listen i ${weekLabel()}.`), 50); } else { rerender(); toast(`${n} er gemt under ${BANK.opskrifter[n].kategori}.`); }
       return; }
     const spl = e.target.closest('[data-splitrecipe]');
     if (spl) { const r = splitRecipe(document.getElementById('rall').value); const f = document.getElementById('recipeform'); const h = document.getElementById('rall-help');
@@ -1375,7 +1510,7 @@
     const ad = e.target.closest('[data-addish]');
     if (ad) { const d = ad.dataset.addish; if (!W().dishes.includes(d)) W().dishes.push(d); save(); buzz(); location.hash = '#/indkob'; return; }
     const rd = e.target.closest('[data-rmdish]');
-    if (rd) { W().dishes = W().dishes.filter((x) => x !== rd.dataset.rmdish); save(); rerender(); alertLine(`${rd.dataset.rmdish} er fjernet fra ugen.`); return; }
+    if (rd) { W().dishes = W().dishes.filter((x) => x !== rd.dataset.rmdish); if (W().plan) delete W().plan[rd.dataset.rmdish]; save(); rerender(); alertLine(`${rd.dataset.rmdish} er fjernet fra ugen.`); return; }
     const ap = e.target.closest('[data-approve]');
     if (ap) { const v = ap.dataset.approve; if (db.cards[v]) delete db.cards[v].auto; save(); rerender(); alertLine(`${v} er godkendt.`); return; }
     const os_ = e.target.closest('[data-ov-save]');
@@ -1439,6 +1574,30 @@
     }
     const u = e.target.closest('[data-undo]');
     if (u && undo) { W().ticks[undo.v] = undo.t; const v = undo.v; undo = null; save(); rerender(); document.querySelector(`[data-tick="${CSS.escape(v)}"]`)?.focus({ preventScroll: true }); return; }
+    const vm = e.target.closest('[data-vmode]');
+    if (vm) { chooser.mode = vm.dataset.vmode; chooser.items = []; chooser.empty = false; chooser.seen = new Set(); rerender(); main.querySelector(`[data-vmode="${vm.dataset.vmode}"]`)?.focus({ preventScroll: true }); return; }
+    const vf = e.target.closest('[data-vf]');
+    if (vf) { const k = vf.dataset.vf; if (chooser.f.has(k)) chooser.f.delete(k); else { chooser.f.add(k); if (k === 'egne') chooser.f.delete('nyt'); if (k === 'nyt') chooser.f.delete('egne'); } chooser.items = []; chooser.empty = false; chooser.seen = new Set(); rerender(); main.querySelector(`[data-vf="${k}"]`)?.focus({ preventScroll: true }); return; }
+    if (e.target.closest('[data-pick-again]')) { chooser.items = []; chooser.empty = false; rerender(); buzz(); return; }
+    if (e.target.closest('[data-pick-add]')) { const d = chooser.items[0]; addDish(d.n); save(); buzz(); chooser.added[d.n] = true; rerender(); alertLine(`${d.n} er på listen i ${weekLabel()}.`); return; }
+    const pdy = e.target.closest('[data-pickday]');
+    if (pdy) { const d = chooser.items[0]; W().plan ||= {}; if (W().plan[d.n] === +pdy.dataset.pickday) delete W().plan[d.n]; else W().plan[d.n] = +pdy.dataset.pickday; save(); rerender(); main.querySelector(`[data-pickday="${pdy.dataset.pickday}"]`)?.focus({ preventScroll: true }); return; }
+    const psw = e.target.closest('[data-pickswap]');
+    if (psw) { const i = +psw.dataset.pickswap; const keep = chooser.items.filter((_, k) => k !== i); const ex = new Set(chooser.items.map((x) => x.n)); const r = pickDishes(1, ex, keep); if (r.length) chooser.items[i] = r[0]; else toast('Der er ikke flere retter, der passer.'); rerender(); main.querySelector(`[data-pickswap="${i}"]`)?.focus({ preventScroll: true }); return; }
+    const pn = e.target.closest('[data-pickn]');
+    if (pn) { chooser.n = Math.max(2, Math.min(7, chooser.n + +pn.dataset.pickn)); chooser.items = []; chooser.empty = false; rerender(); main.querySelector(`[data-pickn="${pn.dataset.pickn}"]:not([disabled])`)?.focus({ preventScroll: true }); return; }
+    if (e.target.closest('[data-pick-addall]')) { const names = chooser.items.map((x) => x.n); names.forEach(addDish); const had = Object.keys(W().plan || {}).length; autoPlan(names); const planned = Object.keys(W().plan || {}).length - had; save(); buzz(); location.hash = '#/indkob'; setTimeout(() => toast(`${pl(names.length, 'ret', 'retter')} er på listen${planned ? ` og ${planned === names.length ? 'fordelt på dagene' : `${pl(planned, 'fik', 'fik')} en dag`}` : ''}.`), 50); return; }
+    if (e.target.closest('[data-plan-auto]')) { autoPlan(W().dishes); save(); rerender(); const h = document.getElementById('plan-help'); if (h) h.textContent = 'Retterne er fordelt på dagene. Ret dem, hvis I vil.'; return; }
+    const th = e.target.closest('[data-thawed]');
+    if (th) { const [wk, dish] = th.dataset.thawed.split('|'); if (db.weeks[wk]) { (db.weeks[wk].thawed ||= {})[dish] = true; } save(); rerender(); toast(`${dish}: kødet er taget op.`); return; }
+    if (e.target.closest('[data-ics]')) {
+      const h = document.getElementById('plan-help'); const { n, text } = icsText();
+      if (!n) { if (h) h.textContent = 'Ingen retter med kød har fået en dag endnu. Vælg en dag til retten først.'; return; }
+      const name = `varevennen-paamindelser-${weekLabel().replace(' ', '')}.ics`; const file = new File([text], name, { type: 'text/calendar' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: 'Påmindelser fra Varevennen' }).catch(() => {});
+      else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.append(a); a.click(); a.remove(); }
+      if (h) h.textContent = `${pl(n, 'påmindelse', 'påmindelser')} er lavet. Åbn filen, så lægges de i kalenderen.`; return;
+    }
     const ot = e.target.closest('[data-opt]');
     if (ot) { const v = ot.dataset.opt; W().opt ||= {}; if (W().opt[v]) delete W().opt[v]; else W().opt[v] = true; save(); buzz(); rerender(); main.querySelector(`[data-opt="${CSS.escape(v)}"]`)?.focus({ preventScroll: true }); toast(isOpt(v) ? `${v} kan undværes.` : `${v} skal med.`); return; }
     const qo = e.target.closest('[data-qtyopen]');
@@ -1466,7 +1625,7 @@
       placeAt(c, n, p || { navn: `Scannet vare, stregkode ${tch.dataset.ean}`, ean: tch.dataset.ean }); delete c.auto; save(); buzz();
       const to = `#/scan?ean=${tch.dataset.ean}&vare=${slug(v)}`; if (location.hash === to) rerender(); else location.replace(to); alertLine(`Gemt som prio ${n} for ${v}.`); return; }
     const d = e.target.closest('input[data-dish]');
-    if (d) { const set = new Set(W().dishes); set.has(d.dataset.dish) ? set.delete(d.dataset.dish) : set.add(d.dataset.dish); W().dishes = [...set]; save(); rerender(); document.querySelector(`[data-dish="${CSS.escape(d.dataset.dish)}"]`)?.focus({ preventScroll: true }); return; }
+    if (d) { const set = new Set(W().dishes); set.has(d.dataset.dish) ? set.delete(d.dataset.dish) : set.add(d.dataset.dish); W().dishes = [...set]; if (!set.has(d.dataset.dish) && W().plan) delete W().plan[d.dataset.dish]; save(); rerender(); document.querySelector(`[data-dish="${CSS.escape(d.dataset.dish)}"]`)?.focus({ preventScroll: true }); return; }
     if (e.target.closest('#build')) { location.hash = '#/indkob'; return; }
     const sf = e.target.closest('[data-scanfield]');
     if (sf) { const help = document.getElementById(sf.dataset.scanfield.replace('e', 'p') + '-help'); if (help) help.textContent = 'Kameraet er ikke koblet på endnu. Skriv stregkoden af indtil da.'; }
