@@ -1196,7 +1196,7 @@
   function hjaelp(q) {
     const t = q.get('q') || '';
     return `<div class="screen-head"><h1 tabindex="-1">Hjælp</h1><p class="lead">Søg på det, du vil gøre, fx "antal", "scan" eller "allergi".</p></div>
-      <p><button class="btn btn--quiet btn--s" type="button" data-intro>${icon.play}<span>Se introduktionen igen</span></button></p>
+      <p><button class="btn btn--quiet btn--s" type="button" data-intro>${icon.play}<span>Se introduktionen igen</span></button> <button class="btn btn--quiet btn--s" type="button" data-nyt>${icon.play}<span>Nyt i appen</span></button></p>
       <div class="field minesearch"><label class="visually-hidden" for="helpq">Søg i hjælpen</label><span class="composer__field">${icon.search}<input id="helpq" type="search" placeholder="Hvad vil du gøre?" value="${esc(t)}" autocomplete="off" data-helpsearch></span></div>
       <ul class="help-list">${HELP.map((h, i) => `<li data-q="${esc(norm(h.q + ' ' + h.a + ' ' + h.ord))}"><details${t && i === 0 ? ' open' : ''}><summary>${esc(h.q)}</summary><p>${esc(h.a)}</p><p><a class="btn btn--quiet btn--s" href="${h.link}">${esc(h.knap)}</a></p></details></li>`).join('')}</ul>
       <p class="meta" id="help-none" hidden>Intet svar på det. Prøv et andet ord, eller se introduktionen igen øverst.</p>`;
@@ -1217,8 +1217,19 @@
     dlg.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; });
     dlg.addEventListener('pointerup', (e) => { if (sx == null) return; const dx = e.clientX - sx, dy = e.clientY - sy; sx = null; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) go(dx < 0 ? 1 : -1); });
     dlg.addEventListener('pointercancel', () => { sx = null; });
-    dlg.addEventListener('close', () => { db.introSet = true; save(); dlg.remove(); });
+    dlg.addEventListener('close', () => { db.introSet = true; if (NYT[0] && !db.nytSet) db.nytSet = NYT[0].id; save(); dlg.remove(); });
     document.body.append(dlg); draw(); dlg.showModal(); dlg.querySelector('[data-intro-next]')?.focus();
+  }
+  // ---------- nyt i appen (vises én gang efter en opdatering) ----------
+  const NYT = window.NYT || [];
+  function showNyt(all) {
+    const list = all ? NYT.slice(0, 3) : NYT.filter((n) => n.id > (db.nytSet || '')).slice(0, 3);
+    if (!list.length) return;
+    const dlg = document.createElement('dialog'); dlg.className = 'intro nyt'; dlg.setAttribute('aria-labelledby', 'nyt-h');
+    dlg.innerHTML = `<div class="intro__in"><p class="intro__step meta">Nyt i appen</p><h2 id="nyt-h">${esc(list[0].titel)}</h2>${list.map((n, k) => `${k ? `<h3 class="nyt__old">${esc(n.titel)} <span class="meta">${esc(n.dato)}</span></h3>` : ''}<ul class="nyt__list">${n.punkter.map((x) => `<li><strong>${esc(x.h)}</strong><span>${esc(x.p)}</span>${x.href ? `<a href="${x.href}" data-nyt-go>Se det</a>` : ''}</li>`).join('')}</ul>`).join('')}<div class="intro__act"><button class="btn btn--primary" type="button" data-nyt-ok>Forstået</button></div></div>`;
+    dlg.addEventListener('click', (e) => { if (e.target.closest('[data-nyt-ok],[data-nyt-go]')) dlg.close(); });
+    dlg.addEventListener('close', () => { if (NYT[0]) db.nytSet = NYT[0].id; save(); dlg.remove(); });
+    document.body.append(dlg); dlg.showModal(); dlg.querySelector('[data-nyt-ok]')?.focus({ preventScroll: true });
   }
   main.addEventListener('input', (e) => { if (!e.target.matches('[data-helpsearch]')) return; const t = norm(e.target.value); let n = 0; main.querySelectorAll('.help-list > li').forEach((li) => { const hit = !t || t.split(' ').every((w) => li.dataset.q.includes(w) || li.dataset.q.includes(stem(w))); li.hidden = !hit; n += hit; }); document.getElementById('help-none').hidden = !!n; const first = main.querySelector('.help-list > li:not([hidden]) details'); if (t && n <= 2 && first) first.open = true; });
 
@@ -1502,6 +1513,7 @@
     }
     if (e.target.closest('[data-sharepdf]') && window.__lastPdf) { navigator.share({ files: [window.__lastPdf], title: `Indkøb, ${weekLabel()}` }).catch(() => {}); return; }
     if (e.target.closest('[data-intro]')) { showIntro(); return; }
+    if (e.target.closest('[data-nyt]')) { showNyt(true); return; }
     const ko = e.target.closest('[data-kost]');
     if (ko) { const pf = prof(); const k = ko.dataset.kost; pf.kost = (pf.kost || []).includes(k) ? pf.kost.filter((x) => x !== k) : [...(pf.kost || []), k]; save(); rerender(); main.querySelector(`[data-kost="${k}"]`)?.focus({ preventScroll: true }); return; }
     const al = e.target.closest('[data-allergi]');
@@ -1757,6 +1769,10 @@
   // the intro, once (tests run with ?intro=0)
   if (!db.introSet && !/[?&]intro=0/.test(location.search) && !navigator.webdriver) setTimeout(showIntro, 300);
   if (/[?&]intro=1/.test(location.search)) setTimeout(showIntro, 300);
+  // efter en opdatering: vis det nye én gang (nye brugere ser introduktionen i stedet)
+  if (!db.introSet && NYT[0] && !db.nytSet) { db.nytSet = NYT[0].id; save(); }
+  else if (db.introSet && NYT[0] && (db.nytSet || '') < NYT[0].id && !/[?&]intro=0/.test(location.search) && !navigator.webdriver) setTimeout(() => showNyt(false), 600);
+  if (/[?&]nyt=1/.test(location.search)) setTimeout(() => showNyt(true), 300);
   // offline and installable: only where the page is served over https (or localhost) from its own origin
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then((reg) => {
