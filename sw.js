@@ -1,9 +1,9 @@
 // Offline: the app shell is stored on install; pictures and videos are stored the first time they are shown.
 // Answers come from the store first, and the store is refreshed in the background, so a new version
 // shows the next time the app is opened. Bump VERSION when the shell list changes.
-const VERSION = 'drv-2026-11-23c';
+const VERSION = 'drv-2026-11-24a';
 const SHELL = ['./', './index.html', './app.css', './tokens.css', './base.css', './manifest.webmanifest', './fonts/archivo-wdth.woff2',
-  './data.js', './produkter.js', './rens.js', './retter-billeder.js', './opskrifter.js', './opskriftsbank.js', './bank-billeder.js', './illustrationer.js', './teknikker.js', './videoer.js',
+  './data.js', './produkter.js', './rens.js', './retter-billeder.js', './opskrifter.js', './opskriftsbank.js', './bank-billeder.js', './naering.js', './illustrationer.js', './teknikker.js', './videoer.js',
   './priser.js', './pdf-maker.js', './scanner.js', './app.js', './icons/icon-192.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });

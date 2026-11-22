@@ -322,6 +322,57 @@
       return `${big(x1)}-${big(parseFloat(n2.replace(',', '.')) * f)}`;
     });
   }
+  // ---------- nutrition (optional, off by default): from products, else a typical value ----------
+  const NAE = window.NAERING || { typisk: {}, vaegt: {}, enhed: {}, kodvarer: [] };
+  const nutOn = () => !!(db.profil && db.profil.naering);
+  const KOST = { vegetar: 'Vegetar', let: 'Let, under 600 kcal', protein: 'Mere protein', lowcarb: 'Færre kulhydrater' };
+  function nutOf(v) {
+    const c = stdCard(v); const p = c && prodOf(c, 1);
+    if (p && p.naering) return { ...p.naering, src: 'produkt' };
+    const ps = (PR[v] || []).filter((x) => x.naering);
+    if (ps.length >= 2) { const med = (k) => { const a = ps.map((x) => x.naering[k]).filter((x) => x != null).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; }; return { kcal: med('kcal'), protein: med('protein'), kulh: med('kulh'), fedt: med('fedt'), src: 'typisk' }; }
+    const t = NAE.typisk[v]; return t ? { kcal: t[0], protein: t[1], kulh: t[2], fedt: t[3], src: 'typisk' } : null;
+  }
+  // "500 g", "2 dåser", "1/4 hoved", "8-12 stk", "2,5 dl" -> grams of the item
+  function gramsOf(amt, v) {
+    const s = String(amt || '').toLowerCase().replace(',', '.');
+    const m = s.match(/(\d+(?:\.\d+)?)\s*(?:\/\s*(\d+))?(?:\s*-\s*(\d+(?:\.\d+)?))?\s*([a-zæøå]+)?/);
+    if (!m) return null;
+    let n = +m[1]; if (m[2]) n = n / +m[2]; if (m[3]) n = (n + +m[3]) / 2;
+    const u = m[4] || 'stk';
+    if (u === 'g' || u === 'gram') return n; if (u === 'kg') return n * 1000;
+    if (u === 'dl') return n * 100; if (u === 'l' || u === 'liter') return n * 1000; if (u === 'ml') return n;
+    if (u === 'spsk') return n * (/mel|rasp|sukker/i.test(v) ? 10 : 15); if (u === 'tsk') return n * 4;
+    if (u === 'stk' || u === 'hoved') return n * (NAE.vaegt[v] || 100);
+    if (NAE.vaegt[v] && !NAE.enhed[u]) return n * NAE.vaegt[v];
+    return n * (NAE.enhed[u] || NAE.vaegt[v] || 100);
+  }
+  // per person, for a dish in the cookbook or in the recipe bank
+  function dishNut(d) {
+    const o = OP[d]; const b = BANK.opskrifter[d];
+    const pairs = o && o.maengder ? Object.entries(o.maengder).map(([v, a]) => [v, a]) : b ? b.ing.map(([a, v]) => [v, a]) : [];
+    if (!pairs.length) return null;
+    const per = (o && o.personer) || 4; const tot = { kcal: 0, protein: 0, kulh: 0, fedt: 0 }; const missing = [];
+    pairs.forEach(([v, a]) => { const n = nutOf(v); const g = gramsOf(a, v); if (!n || g == null) { missing.push(v); return; } ['kcal', 'protein', 'kulh', 'fedt'].forEach((k) => { tot[k] += (n[k] || 0) * g / 100; }); });
+    const r = {}; Object.keys(tot).forEach((k) => { r[k] = Math.round(tot[k] / per); }); r.missing = missing; return r;
+  }
+  const fmtN = (x) => (x == null ? '–' : Number(x).toLocaleString('da-DK', { maximumFractionDigits: 1 }));
+  const nutLine = (n) => n ? `ca. ${n.kcal} kcal pr. person` : '';
+  const nutBlock = (n) => n ? `<div class="nutri" role="group" aria-label="Næring pr. person"><span><b>ca. ${n.kcal}</b> kcal</span><span><b>${n.protein} g</b> protein</span><span><b>${n.kulh} g</b> kulhydrat</span><span><b>${n.fedt} g</b> fedt</span></div>${n.missing.length ? `<p class="meta">Uden ${esc(n.missing.map(lower1).join(', '))}, som appen ikke har tal for.</p>` : ''}` : '';
+  // the household's food profile filters the cookbook
+  function kostOk(d) {
+    const k = (nutOn() && db.profil.kost) || []; if (!k.length) return true;
+    const vs = BANK.opskrifter[d] ? BANK.opskrifter[d].ing.map((x) => x[1]) : (S.retter[d] || []);
+    if (k.includes('vegetar') && vs.some((v) => NAE.kodvarer.includes(v))) return false;
+    const n = dishNut(d); if (!n || !n.kcal) return true;
+    if (k.includes('let') && n.kcal > 600) return false;
+    if (k.includes('protein') && (n.protein * 4) / n.kcal < 0.22) return false;
+    if (k.includes('lowcarb') && (n.kulh * 4) / n.kcal > 0.3) return false;
+    return true;
+  }
+  const kostNote = () => { const k = (nutOn() && db.profil.kost) || []; return k.length ? `<p class="meta kostnote">Viser kun: ${k.map((x) => KOST[x].toLowerCase()).join(', ')}. <a class="link" href="#/profil?vis=p-naering">Ret</a></p>` : ''; };
+  const nutriBadge = (g) => g ? `<span class="nscore" data-g="${esc(g)}" title="Nutri-Score ${esc(g.toUpperCase())}">${esc(g.toUpperCase())}</span>` : '';
+
   // ---------- recipe book: every dish sits in a chapter ----------
   const EMNE_STD = {
     'Boller i karry': 'Klassikere', 'Frikadeller med grøntsager og pasta': 'Klassikere', 'Karbonader med sovs og pasta': 'Klassikere', 'Stegt flæsk': 'Klassikere', 'Hønsekødssuppe': 'Klassikere', 'Tarteletter': 'Klassikere', 'Biksemad': 'Klassikere',
@@ -441,6 +492,7 @@
       <section class="weekstrip no-print" aria-labelledby="ws"><h2 id="ws">Rækkefølgen i ${weekLabel()}</h2><p class="meta">Træk billederne for at bytte om. Det ændrer kun denne uges liste.</p>${prioStrip(v, 'week')}
         ${hasOv(v) ? `<p class="photo-row"><button class="btn btn--quiet btn--s" type="button" data-ov-save="${esc(v)}">Gem som standard</button><button class="btn btn--quiet btn--s" type="button" data-ov-reset="${esc(v)}">Brug standard</button></p>` : ''}</section>
       ${facts ? `<dl class="facts">${facts}</dl>` : ''}
+      ${nutOn() ? (() => { const n = nutOf(v); const p1 = prodOf(c, 1); return n ? `<section class="section" aria-labelledby="nh"><h2 id="nh">Næring pr. 100 g ${nutriBadge(n.nutri)}</h2><div class="nutri"><span><b>${fmtN(n.kcal)}</b> kcal</span><span><b>${fmtN(n.protein)} g</b> protein</span><span><b>${fmtN(n.kulh)} g</b> kulhydrat</span><span><b>${fmtN(n.fedt)} g</b> fedt</span>${n.sukker != null ? `<span><b>${fmtN(n.sukker)} g</b> sukker</span>` : ''}${n.salt != null ? `<span><b>${fmtN(n.salt)} g</b> salt</span>` : ''}</div><p class="meta">${n.src === 'produkt' ? `For ${esc(prodLabel(p1))}, fra Open Food Facts.` : 'Typisk værdi for varen, ikke for et bestemt produkt.'}</p></section>` : ''; })() : ''}
       <p class="no-print linkrow"><a class="link link--block" href="#/priser/${slug(v)}">Priser og tilbud</a><a class="link link--block" href="#/kort/${slug(v)}/rediger">Ret kortet</a></p>
       ${p1p && p1p.billede ? '' : `<div class="nophoto no-print"><p class="meta">Intet billede endnu. Tag et foto af pakken, eller vælg produktet, så kommer billedet med.</p><p class="photo-row">${photoPick('card', v, 1, false, 'Tag foto')}<a class="btn btn--quiet btn--s" href="#/vaelg/${slug(v)}?prio=1">Vælg produkt</a></p></div>`}
       ${(() => { const cur = new Set([1, 2, 3].map((n) => c['ean' + n]).filter(Boolean)); const alt = suggest(v, 10).filter((p) => !cur.has(p.ean)).slice(0, 8); return alt.length ? `<section class="section switch no-print" aria-labelledby="sw"><h2 id="sw">Skift til en anden ${esc(lower1(v))}</h2><p class="meta">Tryk for at gøre den til prio 1 i ${weekLabel()}. De andre rykker ned.</p><ul class="switch__list">${alt.map((p) => `<li><button type="button" class="switch__btn" data-swap="${esc(p.ean)}" data-vare="${esc(v)}">${thumb(p, 'switch__img')}<span class="meta"><b>${esc(p.maerke)}</b> ${nb(p.navn)}</span></button></li>`).join('')}</ul><p><a class="link link--block" href="#/vaelg/${slug(v)}?prio=1">Se alle ${pl((PR[v] || []).length, 'produkt', 'produkter')}</a></p></section>` : ''; })()}
@@ -526,6 +578,7 @@
       ${img ? `<figure class="dish__hero"><img src="${esc(img)}" alt="${esc(d)}" width="500" height="375"></figure>` : ''}
       <div class="screen-head"><h1 tabindex="-1">${esc(d)}</h1>${o ? `<div class="portions"><span class="label">Personer</span><span class="stepper" role="group" aria-label="Antal personer"><button class="iconbtn" type="button" data-port="-1" data-dish-name="${esc(d)}" aria-label="Færre personer" ${persons <= 1 ? 'disabled' : ''}>${icon.minus}</button><output class="stepper__n" aria-live="polite">${persons}</output><button class="iconbtn" type="button" data-port="1" data-dish-name="${esc(d)}" aria-label="Flere personer" ${persons >= 20 ? 'disabled' : ''}>${icon.plus}</button></span>${o.tid ? `<span class="meta">${esc(o.tid)}</span>` : ''}</div>` : ''}<div class="chaptersel no-print"><label for="emnesel">Kapitel</label><select class="input" id="emnesel" data-emne="${esc(d)}">${emner().map((e) => `<option ${emneOf(d) === e ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></div>${o ? `<p><a class="link" href="#/ny-opskrift?ret=${slug(d)}">${db.opskrifter && db.opskrifter[d] ? 'Ret opskriften' : 'Lav jeres egen udgave'}</a></p>` : ''}</div>
       <p class="photo-row no-print">${photoPick('dish', d, 0, !!(db.dishFoto && db.dishFoto[d]), 'Eget foto af retten')}</p>
+      ${nutOn() && dishNut(d) ? `<section class="section" aria-label="Næring">${nutBlock(dishNut(d))}</section>` : ''}
       <section class="section" aria-labelledby="ing"><h2 id="ing">Det skal I bruge</h2><p class="meta">Fjern fluebenet ved det, I har hjemme. Træk mærkerne for at bytte om i ${weekLabel()}.</p>
         <ul class="ings">${items.map((v, k) => { const im = itemImg(v); const c = card(v); const bl = blockOf(v); if (bl) return `<li class="ing--off"><span class="dish__tick" aria-hidden="true"></span><a class="ing__open" href="#/kort/${slug(v)}"><span class="ing__img ing__img--none" aria-hidden="true"></span><span class="row__txt"><span class="row__name">${esc(v)}</span><span class="row__want">Ikke på listen. ${esc(bl)}</span></span></a></li>`; return `<li><input type="checkbox" id="i${k}" data-ing="${esc(v)}" ${skip.has(v) ? '' : 'checked'} aria-label="Køb ${esc(v)}"><label for="i${k}" class="dish__tick"><span class="box" aria-hidden="true">${icon.check}</span></label>
           <a class="ing__open" href="#/kort/${slug(v)}">${im ? `<img class="ing__img" src="${esc(im.src)}" alt="" width="400" height="400" loading="lazy">` : '<span class="ing__img ing__img--none" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(v)}${o && o.maengder[v] ? `<span class="amt">, ${esc(scaleAmt(o.maengder[v], f))}</span>` : ''}</span><span class="row__want">${c && c.p1 ? nb(c.p1) : im && kindText[im.kind] ? `${kindText[im.kind]}. Intet varekort endnu` : 'Intet varekort endnu'}</span></span></a>${c && c.p1 ? `<div class="ing__strip">${prioStrip(v, 'week', 'strip--s')}</div>` : ''}</li>`; }).join('')}</ul>
@@ -569,10 +622,11 @@
     const sel = new Set(W().dishes);
     const n = [...new Set([...sel].flatMap(needOf))].length;
     const em = q && q.get('emne'); const chapters = emner();
-    const names = Object.keys(S.retter).filter((d) => !em || emneOf(d) === em).sort((a, b) => (chapters.indexOf(emneOf(a)) - chapters.indexOf(emneOf(b))) || (S.start.includes(b) - S.start.includes(a)) || a.localeCompare(b, 'da'));
+    const names = Object.keys(S.retter).filter((d) => (!em || emneOf(d) === em) && (kostOk(d) || sel.has(d))).sort((a, b) => (chapters.indexOf(emneOf(a)) - chapters.indexOf(emneOf(b))) || (S.start.includes(b) - S.start.includes(a)) || a.localeCompare(b, 'da'));
     const bookNav = `<nav class="chips chips--scroll booknav" aria-label="Kapitler i opskriftsbogen"><a class="chip" data-replace href="#/retter" ${!em ? 'aria-current="true"' : ''}>Alle <small>${Object.keys(S.retter).length}</small></a>${chapters.map((e) => `<a class="chip" data-replace href="#/retter?emne=${slug(e)}" ${em === e ? 'aria-current="true"' : ''}>${esc(e)} <small>${Object.keys(S.retter).filter((d) => emneOf(d) === e).length}</small></a>`).join('')}</nav>`;
     return `${segNav('uge')}<div class="screen-head"><h1 tabindex="-1">Hvad skal vi spise i ${weekLabel()}?</h1>${weekNav()}<p class="lead">Sæt flueben ved ugens retter. Tryk på en ret for at se opskriften og vælge, hvad der skal købes.</p><p class="retter__links"><a class="howto" href="#/kogebog">${icon.search}Find flere retter</a><a class="howto" href="#/ny-opskrift">${icon.plus}Skriv jeres egen</a><a class="howto" href="#/teknikker">${icon.play}Sådan gør du</a></p></div>
-      ${bookNav}<fieldset><legend class="visually-hidden">Retter</legend><ul class="dishes">${names.map((d, i) => (i === 0 || emneOf(names[i - 1]) !== emneOf(d) ? `<li class="chapter"><h2>${esc(emneOf(d))}</h2></li>` : '') + `<li><input type="checkbox" id="d${i}" data-dish="${esc(d)}" ${sel.has(d) ? 'checked' : ''} aria-label="Vælg ${esc(d)} til ${weekLabel()}"><label for="d${i}" class="dish__tick"><span class="box" aria-hidden="true">${icon.check}</span></label><a class="dish__open" href="#/ret/${slug(d)}">${dishImg(d) ? `<img class="dish__img" src="${esc(dishImg(d))}" alt="" width="500" height="375" loading="lazy">` : '<span class="dish__img dish__img--none" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(d)}</span><span class="row__want">${pl(needOf(d).length, 'vare', 'varer')}${needOf(d).length < S.retter[d].length ? ` (${S.retter[d].length - needOf(d).length} har I)` : ''}${S.start.includes(d) ? ', startret' : ''}${db.dishFoto && db.dishFoto[d] ? ', eget foto' : ''}</span></span></a><label class="iconbtn dish__cam" title="Eget foto">${icon.camera}<input type="file" accept="image/*" class="visually-hidden" data-photo="dish" data-key="${esc(d)}" data-n="0" aria-label="Eget foto af ${esc(d)}"></label></li>`).join('')}</ul></fieldset>
+      ${nutOn() ? (() => { const ns = [...sel].map(dishNut).filter((x) => x && x.kcal); if (!ns.length) return ''; const avg = (k) => Math.round(ns.reduce((a, x) => a + x[k], 0) / ns.length); return `<section class="summary weeknut" aria-label="Ugens aftensmad"><p class="progress"><b>ca. ${avg('kcal')}</b><span class="meta">kcal pr. person i gennemsnit for ${pl(ns.length, 'ret', 'retter')} i ${weekLabel()}</span></p><p class="meta">${avg('protein')} g protein, ${avg('kulh')} g kulhydrat og ${avg('fedt')} g fedt pr. portion. Regnet ud fra opskrifterne, ikke fra hvad I har spist.</p></section>`; })() : ''}
+      ${bookNav}<fieldset><legend class="visually-hidden">Retter</legend><ul class="dishes">${names.map((d, i) => (i === 0 || emneOf(names[i - 1]) !== emneOf(d) ? `<li class="chapter"><h2>${esc(emneOf(d))}</h2></li>` : '') + `<li><input type="checkbox" id="d${i}" data-dish="${esc(d)}" ${sel.has(d) ? 'checked' : ''} aria-label="Vælg ${esc(d)} til ${weekLabel()}"><label for="d${i}" class="dish__tick"><span class="box" aria-hidden="true">${icon.check}</span></label><a class="dish__open" href="#/ret/${slug(d)}">${dishImg(d) ? `<img class="dish__img" src="${esc(dishImg(d))}" alt="" width="500" height="375" loading="lazy">` : '<span class="dish__img dish__img--none" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(d)}</span><span class="row__want">${nutOn() && dishNut(d) ? `ca. ${dishNut(d).kcal} kcal, ` : ''}${pl(needOf(d).length, 'vare', 'varer')}${needOf(d).length < S.retter[d].length ? ` (${S.retter[d].length - needOf(d).length} har I)` : ''}${S.start.includes(d) ? ', startret' : ''}${db.dishFoto && db.dishFoto[d] ? ', eget foto' : ''}</span></span></a><label class="iconbtn dish__cam" title="Eget foto">${icon.camera}<input type="file" accept="image/*" class="visually-hidden" data-photo="dish" data-key="${esc(d)}" data-n="0" aria-label="Eget foto af ${esc(d)}"></label></li>`).join('')}</ul></fieldset>
       ${Object.keys(RB).length ? `<details class="credits"><summary>Fotokreditering</summary><ul>${names.filter((d) => RB[d] && !(db.dishFoto && db.dishFoto[d])).map((d) => `<li>${esc(d)}: ${esc(RB[d].credit)}</li>`).join('')}</ul></details>` : ''}
       <div class="dock"><div class="dock__in"><button class="btn btn--primary" type="button" id="build" ${sel.size ? '' : 'disabled'}>Byg listen, ${pl(n, 'vare', 'varer')}</button></div></div>`;
   }
@@ -647,6 +701,7 @@
     return head + `<div class="scan">
       ${r.p && r.p.billede ? `<img class="scan__img" src="${esc(r.p.billede)}" alt="" width="400" height="400">` : ''}
       <div class="verdict" role="status">${m}<div class="verdict__text"><p class="verdict__say">${esc(say)}</p><p class="meta">${esc(about || pName)}</p></div></div>
+      ${nutOn() ? (() => { const n = (r.p && r.p.naering) || (r.v && nutOf(r.v)); return n ? `<p class="scan__nut">${nutriBadge(n.nutri)} ${fmtN(n.kcal)} kcal pr. 100 g, ${fmtN(n.protein)} g protein</p>` : ''; })() : ''}
       <p>${esc(sub)}</p>
       <div class="actions">${act}${again}</div>
       ${teach}
@@ -754,7 +809,7 @@
     const withData = Object.values(PR).flat().filter((p) => (p.allergener || []).length || (p.spor || []).length).length;
     const allP = Object.values(PR).flat().length;
     return `<div class="screen-head"><h1 tabindex="-1">Profil og indstillinger</h1><p class="lead">Det her gælder hele husstanden, og det gemmes på telefonen.</p></div>
-      <nav class="toc" aria-label="På siden"><a class="chip" href="#/profil?vis=p-allergi" data-replace>Allergier</a><a class="chip" href="#/profil?vis=p-aldrig" data-replace>Varer I aldrig køber</a><a class="chip" href="#/profil?vis=p-butik" data-replace>Butik</a><a class="chip" href="#/profil?vis=p-varer" data-replace>Jeres varer</a><a class="chip" href="#/teknikker">Sådan gør du</a></nav>
+      <nav class="toc" aria-label="På siden"><a class="chip" href="#/profil?vis=p-allergi" data-replace>Allergier</a><a class="chip" href="#/profil?vis=p-aldrig" data-replace>Varer I aldrig køber</a><a class="chip" href="#/profil?vis=p-butik" data-replace>Butik</a><a class="chip" href="#/profil?vis=p-naering" data-replace>Næring</a><a class="chip" href="#/profil?vis=p-data" data-replace>Data</a><a class="chip" href="#/profil?vis=p-varer" data-replace>Jeres varer</a><a class="chip" href="#/teknikker">Sådan gør du</a></nav>
       <section class="section" id="p-allergi" aria-labelledby="pa"><h2 id="pa">Allergier</h2>
         <p class="meta">Varer, der selv er allergenet, tages af listen, fx æg ved æggeallergi. Produkter, der indeholder det eller kan have spor af det, skjules i forslag og når I vælger produkt.</p>
         <div class="chips chips--wrap" role="group" aria-label="Allergier">${ALLERGENER.map((a) => `<button type="button" class="chip" data-allergi="${a.id}" aria-pressed="${pf.allergi.includes(a.id)}">${pf.allergi.includes(a.id) ? icon.check : ''}${esc(a.navn)}</button>`).join('')}</div>
@@ -766,6 +821,9 @@
       <section class="section" id="p-butik" aria-labelledby="pb"><h2 id="pb">Butik</h2>
         <div class="field"><label for="pshop">Jeres foretrukne butik</label><select class="input" id="pshop" data-shop>${['', ...CHAINS].map((c) => `<option value="${esc(c)}" ${db.shop === c ? 'selected' : ''}>${c || 'Ingen bestemt'}</option>`).join('')}</select></div>
         <p class="meta">Produkter, der er set i butikken, står først i forslagene, og på listen ser I, hvilken prio butikken har.</p></section>
+      <section class="section" id="p-naering" aria-labelledby="pn2"><h2 id="pn2">Næring</h2>
+        <div class="choice choice--inline"><input type="checkbox" id="nutsw" data-nutsw ${nutOn() ? 'checked' : ''}><label for="nutsw">Vis næring og kalorier<small>På varekort, retter, opskrifter og når I scanner. Ingen dagbog, ingen mål.</small></label></div>
+        ${nutOn() ? `<p class="label" id="kosth" style="margin-top: var(--space-md)">Jeres kost</p><div class="chips chips--wrap" role="group" aria-labelledby="kosth">${Object.entries(KOST).map(([k, l]) => `<button type="button" class="chip" data-kost="${k}" aria-pressed="${(db.profil.kost || []).includes(k)}">${(db.profil.kost || []).includes(k) ? icon.check : ''}${esc(l)}</button>`).join('')}</div><p class="meta">Kogebogen viser kun retter, der passer. Kalorier er regnet ud fra opskrifternes mængder og produkternes tal, så de er et skøn.</p>` : ''}</section>
       <section class="section" id="p-data" aria-labelledby="pd"><h2 id="pd">Jeres data</h2>
         <p class="meta">Alt ligger kun på denne telefon. Tag en kopi, så I ikke mister varekort, lister og opskrifter, eller send kopien til den anden telefon og hent den ind der.</p>
         <div class="actions"><button class="btn btn--quiet" type="button" data-export>Gem en kopi</button><label class="btn btn--quiet">Hent en kopi ind<input type="file" accept="application/json,.json" class="visually-hidden" data-import></label></div>
@@ -868,15 +926,15 @@
   const SAESONER = BANK.saesoner || {};
   const nowSeason = () => { const m = new Date().getMonth() + 1; return Object.keys(SAESONER).find((k) => SAESONER[k].includes(m)) || 'efterår'; };
   const segNav = (on) => `<nav class="seg no-print" aria-label="Retter og kogebog"><a href="#/retter" ${on === 'uge' ? 'aria-current="page"' : ''}>Ugens retter</a><a href="#/kogebog" ${on === 'bog' ? 'aria-current="page"' : ''}>Kogebog</a></nav>`;
-  const rcard = (n, r) => { const mine = !!S.retter[n]; const im = r ? bankImg(r, n) : dishImg(n); const href = mine ? `#/ret/${slug(n)}` : `#/bank/${slug(n)}`;
-    return `<li class="rcard" data-q="${esc(norm(n + ' ' + (r ? r.ing.map((x) => x[1]).join(' ') : (S.retter[n] || []).join(' '))))}"><a href="${href}">${im ? `<img class="rcard__img" src="${esc(im)}" alt="" width="600" height="450" loading="lazy">` : `<span class="rcard__img rcard__img--none" aria-hidden="true">${icon.pot}</span>`}<span class="rcard__name">${esc(n)}</span><span class="rcard__meta">${r ? esc(r.tid) : pl((S.retter[n] || []).length, 'vare', 'varer')}${mine ? ' · <span class="badge">I kogebogen</span>' : ''}</span></a></li>`; };
+  const rcard = (n, r) => { if (!kostOk(n)) return ''; const mine = !!S.retter[n]; const im = r ? bankImg(r, n) : dishImg(n); const href = mine ? `#/ret/${slug(n)}` : `#/bank/${slug(n)}`;
+    return `<li class="rcard" data-q="${esc(norm(n + ' ' + (r ? r.ing.map((x) => x[1]).join(' ') : (S.retter[n] || []).join(' '))))}"><a href="${href}">${im ? `<img class="rcard__img" src="${esc(im)}" alt="" width="600" height="450" loading="lazy">` : `<span class="rcard__img rcard__img--none" aria-hidden="true">${icon.pot}</span>`}<span class="rcard__name">${esc(n)}</span><span class="rcard__meta">${r ? esc(r.tid) : pl((S.retter[n] || []).length, 'vare', 'varer')}${nutOn() && dishNut(n) ? ` · ca. ${dishNut(n).kcal} kcal` : ''}${mine ? ' · <span class="badge">I kogebogen</span>' : ''}</span></a></li>`; };
   function kogebog(q) {
     const sz = q.get('saeson'); const now = nowSeason();
     const bank = Object.entries(BANK.opskrifter);
-    const shelf = (title, items, more) => items.length ? `<section class="shelf" aria-labelledby="sh-${esc(slug(title))}"><div class="shelf__head"><h2 id="sh-${esc(slug(title))}">${title}</h2>${more ? `<a class="link" href="${more}">Se alle</a>` : ''}</div><ul class="shelf__row">${items.join('')}</ul></section>` : '';
+    const shelf = (title, items, more) => (items = items.filter(Boolean)).length ? `<section class="shelf" aria-labelledby="sh-${esc(slug(title))}"><div class="shelf__head"><h2 id="sh-${esc(slug(title))}">${title}</h2>${more ? `<a class="link" href="${more}">Se alle</a>` : ''}</div><ul class="shelf__row">${items.join('')}</ul></section>` : '';
     const search = `<div class="field minesearch"><label class="visually-hidden" for="bogsq">Søg efter ret eller ingrediens</label><span class="composer__field">${icon.search}<input id="bogsq" type="search" placeholder="Søg på ret eller ingrediens, fx laks" autocomplete="off" data-bogsearch></span></div>`;
     const seasonChips = `<nav class="chips chips--scroll booknav" aria-label="Årstider">${Object.keys(SAESONER).map((k) => `<a class="chip" data-replace href="#/kogebog?saeson=${slug(k)}" ${sz === k ? 'aria-current="true"' : ''}>${k.charAt(0).toUpperCase() + k.slice(1)}${k === now ? ' <small>nu</small>' : ''}</a>`).join('')}</nav>`;
-    const head = `${segNav('bog')}<div class="screen-head"><h1 tabindex="-1">Kogebog</h1><p class="lead">Gå på opdagelse. Læg det, I kan lide, i jeres egen kogebog, og ret det til på jeres måde.</p></div>${search}${seasonChips}`;
+    const head = `${segNav('bog')}<div class="screen-head"><h1 tabindex="-1">Kogebog</h1><p class="lead">Gå på opdagelse. Læg det, I kan lide, i jeres egen kogebog, og ret det til på jeres måde.</p></div>${search}${seasonChips}${kostNote()}`;
     const results = `<ul class="rgrid" id="bogresults" hidden>${[...Object.keys(S.retter).filter((d) => !BANK.opskrifter[d]).map((d) => rcard(d, null)), ...bank.map(([n, r]) => rcard(n, r))].join('')}</ul><p class="meta" id="bog-none" hidden>Ingen retter passer. Prøv en ingrediens, fx kylling.</p>`;
     if (sz && SAESONER[sz]) {
       const list = bank.filter(([, r]) => (r.saeson || []).includes(sz));
@@ -899,7 +957,7 @@
   }
   function findOpskrifter(q) {
     const kat = BANK.kategorier.includes(q.get('kat')) ? q.get('kat') : BANK.kategorier[0];
-    const list = Object.entries(BANK.opskrifter).filter(([, r]) => r.kategori === kat);
+    const list = Object.entries(BANK.opskrifter).filter(([n, r]) => r.kategori === kat && kostOk(n));
     return `${back('#/retter', 'Retter')}<div class="screen-head"><h1 tabindex="-1">Find opskrifter</h1><p class="lead">Almindelige opskrifter i kategorier. Læg dem i jeres kogebog, så kan I rette dem til jeres egen måde.</p></div>
       <nav class="chips chips--scroll booknav" aria-label="Kategorier">${BANK.kategorier.map((k) => `<a class="chip" data-replace href="#/find-opskrifter?kat=${slug(k)}" ${k === kat ? 'aria-current="true"' : ''}>${esc(k)}</a>`).join('')}</nav>
       <ul class="bank">${list.map(([n, r]) => { const im = bankImg(r); const has = !!(db.opskrifter && db.opskrifter[n]); return `<li class="bank__card"><a class="bank__open" href="#/bank/${slug(n)}">${im ? `<img class="bank__img" src="${esc(im)}" alt="" width="400" height="400" loading="lazy">` : `<span class="bank__img bank__img--none" aria-hidden="true">${icon.pot}</span>`}<span class="row__txt"><span class="row__name">${esc(n)}</span><span class="row__want">${esc(r.tid)}, ${pl(r.ing.length, 'ingrediens', 'ingredienser')}</span></span></a>${has ? `<span class="badge bank__has">I kogebogen</span>` : `<button class="btn btn--quiet btn--s" type="button" data-take="${esc(n)}">${icon.plus}<span>Kogebog</span></button>`}</li>`; }).join('')}</ul>`;
@@ -909,7 +967,7 @@
     if (!r) return `${back('#/find-opskrifter', 'Find opskrifter')}<div class="empty"><h2>Opskriften findes ikke</h2></div>`;
     const has = !!(db.opskrifter && db.opskrifter[n]);
     return `${back('#/kogebog', 'Kogebog')}${BB[n] ? `<figure class="dish__hero"><img src="${esc(BB[n].src)}" alt="${esc(n)}" width="600" height="450"></figure>` : ''}<div class="screen-head"><h1 tabindex="-1">${esc(n)}</h1><p class="meta">${esc(r.kategori)}, ${esc(r.tid)}, til 4 personer${(r.saeson || []).length ? `, ${esc(r.saeson.join(' og '))}` : ''}</p></div>
-      <section class="section" aria-labelledby="bi"><h2 id="bi">Det skal I bruge</h2><ul class="pvarer minelist">${r.ing.map(([a, v]) => { const im = itemImg(v); return `<li class="lrow">${im ? `<img class="row__img" src="${esc(im.src)}" alt="" width="400" height="400" loading="lazy">` : '<span class="row__img row__img--blank" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(v)}</span><span class="row__want">${esc(a)}</span></span></li>`; }).join('')}</ul><p class="meta">Fra skabet: salt, peber og olie.</p></section>${BB[n] ? `<p class="credit section">Foto: ${esc(BB[n].credit)}</p>` : ''}
+      <section class="section" aria-labelledby="bi"><h2 id="bi">Det skal I bruge</h2><ul class="pvarer minelist">${r.ing.map(([a, v]) => { const im = itemImg(v); return `<li class="lrow">${im ? `<img class="row__img" src="${esc(im.src)}" alt="" width="400" height="400" loading="lazy">` : '<span class="row__img row__img--blank" aria-hidden="true"></span>'}<span class="row__txt"><span class="row__name">${esc(v)}</span><span class="row__want">${esc(a)}</span></span></li>`; }).join('')}</ul><p class="meta">Fra skabet: salt, peber og olie.</p>${nutOn() ? `<h3 class="nutri__h">Næring</h3>${nutBlock(dishNut(n))}` : ''}</section>${BB[n] ? `<p class="credit section">Foto: ${esc(BB[n].credit)}</p>` : ''}
       <section class="section" aria-labelledby="bs"><h2 id="bs">Sådan gør I</h2><ol class="steps">${r.trin.map((t) => { const hit = Object.entries(TK).filter(([, x]) => x.match && x.match.test(t)).slice(0, 3); return `<li><span>${esc(t)}</span>${hit.length ? `<span class="howtos">${hit.map(([id, x]) => `<a class="howto" href="#/teknik/${id}">${icon.play}${esc(x.navn)}</a>`).join('')}</span>` : ''}</li>`; }).join('')}</ol></section>
       <div class="dock no-print"><div class="dock__in">${has ? `<a class="btn btn--primary" href="#/ret/${slug(n)}">Åbn i kogebogen</a>` : `<button class="btn btn--primary" type="button" data-take="${esc(n)}" data-then="ret">Læg i kogebogen</button><button class="btn btn--quiet" type="button" data-take="${esc(n)}" data-then="uge">På listen i ${weekLabel()}</button>`}</div></div>`;
   }
@@ -1145,6 +1203,7 @@
         .catch(() => { h.textContent = 'Filen kunne ikke læses. Vælg en kopi, der er gemt fra Varevennen.'; });
       return;
     }
+    if (e.target.matches('[data-nutsw]')) { prof().naering = e.target.checked; save(); rerender(); document.getElementById('nutsw')?.focus(); toast(e.target.checked ? 'Næring er slået til.' : 'Næring er slået fra.'); return; }
     if (e.target.matches('[data-withwant]')) { const t = document.getElementById('sharetext'); if (t) t.textContent = shareText(weekData(), e.target.checked); return; }
     if (e.target.matches('[data-shop]')) { db.shop = e.target.value; save(); rerender(); document.getElementById('shop')?.focus(); return; }
     if (e.target.matches('[data-unknown]')) { location.replace(e.target.dataset.unknown); }
@@ -1213,6 +1272,8 @@
       return;
     }
     if (e.target.closest('[data-sharepdf]') && window.__lastPdf) { navigator.share({ files: [window.__lastPdf], title: `Indkøb, ${weekLabel()}` }).catch(() => {}); return; }
+    const ko = e.target.closest('[data-kost]');
+    if (ko) { const pf = prof(); const k = ko.dataset.kost; pf.kost = (pf.kost || []).includes(k) ? pf.kost.filter((x) => x !== k) : [...(pf.kost || []), k]; save(); rerender(); main.querySelector(`[data-kost="${k}"]`)?.focus({ preventScroll: true }); return; }
     const al = e.target.closest('[data-allergi]');
     if (al) { const id = al.dataset.allergi; const pf = prof(); pf.allergi = pf.allergi.includes(id) ? pf.allergi.filter((x) => x !== id) : [...pf.allergi, id]; save(); rerender(); main.querySelector(`[data-allergi="${id}"]`)?.focus({ preventScroll: true }); const a = ALLERGENER.find((x) => x.id === id); const gone = a.varer.filter((v) => blockOf(v)); alertLine(pf.allergi.includes(id) ? `${a.navn} valgt.${gone.length ? ` Taget af listen: ${gone.join(', ')}.` : ''}` : `${a.navn} fjernet.`); return; }
     const fp = e.target.closest('[data-film-play]');
