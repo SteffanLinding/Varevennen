@@ -1,6 +1,12 @@
 // "Nyt i appen": vises én gang, når appen er blevet opdateret. Nyeste først. Ny post = nyt id.
 // Skriv for den, der bruger appen, ikke for udvikleren. Højst 3-4 punkter pr. post.
 window.NYT = [
+  { id: '2026-11-22c', dato: '22. nov.', titel: 'Bedre stregkodelæser',
+    punkter: [
+      { h: 'Læser flere koder', p: 'Scanneren er gjort hurtigere og bedre til at læse små, uskarpe og skæve stregkoder.' },
+      { h: 'Billede af stregkoden', p: 'Kan kameraet ikke læse den live, så tag et billede af koden i stedet. Der er også en lommelygte-knap, hvis telefonen har en.', href: '#/scan' },
+      { h: 'Ukendte varer', p: 'Kender appen ikke varen, slår den den op og lader jer gemme den som prio 1, 2 eller 3 på det rigtige varekort.' }
+    ] },
   { id: '2026-11-22b', dato: '22. nov.', titel: 'Færdigretter og nyheder',
     punkter: [
       { h: 'Færdigretter', p: 'Pizza, lasagne, suppe, sushi og mere fra køledisken. Find dem i Kogebogen.', href: '#/retter?emne=F%C3%A6rdigretter' },

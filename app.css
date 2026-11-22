@@ -916,3 +916,7 @@ label.btn:has(input:focus-visible) { outline: 2px solid var(--color-focus); outl
 .nyt__list span { color: var(--color-ink-soft, inherit); }
 .nyt__list a { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
 .nyt__old { font-size: var(--text-lg, 1rem); margin-top: var(--space-sm); }
+
+/* Scanner-værktøjer */
+.scan__tools { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+#teachsel { width: 100%; }

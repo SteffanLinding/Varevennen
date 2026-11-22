@@ -831,6 +831,7 @@
         <div class="viewfinder" id="viewfinder"><video id="camvid" muted playsinline aria-hidden="true"></video><div class="viewfinder__frame"><p id="cam-msg">Starter kameraet…</p></div></div>
         <p class="lead">${target ? `Hold stregkoden på ${esc(lower1(target))} foran kameraet.` : 'Hold stregkoden foran kameraet. Appen finder selv varen på listen.'}</p>
         <p class="help" id="cam-help" aria-live="polite"></p>
+        <div class="scan__tools"><button class="btn btn--quiet btn--s" type="button" data-torch hidden aria-pressed="false">Tænd lommelygte</button><label class="btn btn--quiet btn--s photo-pick">${icon.camera}<span>Tag billede af stregkoden</span><input type="file" accept="image/*" capture="environment" class="visually-hidden" id="eanfoto" aria-label="Tag billede af stregkoden"></label></div>
         ${manual}</div>`;
     }
     const r = scanVerdict(ean, target);
@@ -854,7 +855,9 @@
     }
     // teach mode: an unknown or wrong code can become a prio on the card right here
     const tv = target || r.owner || '';
-    const teach = r.kind !== 'prio' && tv ? `<section class="section" aria-labelledby="th"><h2 id="th">Er det jeres vare?</h2><p class="meta">Gem stregkoden på kortet for ${esc(lower1(tv))}, så kender appen den næste gang.</p><div class="sugg__to" role="group" aria-labelledby="th">${[1, 2, 3].map((n) => `<button type="button" class="slotbtn" data-teach="${n}" data-vare="${esc(tv)}" data-ean="${esc(ean)}" aria-label="Gem som prio ${n}">${mark(n)}</button>`).join('')}</div></section>` : '';
+    const sug = !tv && r.kind !== 'prio' ? findItems(r.p ? (r.p.navn || '') : '', 4) : [];
+    const pick = !tv && r.kind !== 'prio' ? `<section class="section" aria-labelledby="th"><h2 id="th">Er det jeres vare?</h2><p class="meta">Vælg, hvilken vare det er, og gem stregkoden som prio 1, 2 eller 3 på dens varekort. Så kender appen den næste gang.</p><div class="field"><label for="teachsel">Hvilken vare er det?</label><select class="input" id="teachsel" data-teachsel><option value="">Vælg vare…</option>${sug.length ? `<optgroup label="Forslag">${sug.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</optgroup>` : ''}<optgroup label="Alle varer">${[...allItems()].sort((a, b) => a.localeCompare(b, 'da')).map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</optgroup></select></div><div class="sugg__to" role="group" aria-labelledby="th">${[1, 2, 3].map((n) => `<button type="button" class="slotbtn" data-teach="${n}" data-vare="" data-ean="${esc(ean)}" aria-label="Gem som prio ${n}">${mark(n)}</button>`).join('')}</div></section>` : '';
+    const teach = pick ? pick : r.kind !== 'prio' && tv ? `<section class="section" aria-labelledby="th"><h2 id="th">Er det jeres vare?</h2><p class="meta">Gem stregkoden på kortet for ${esc(lower1(tv))}, så kender appen den næste gang.</p><div class="sugg__to" role="group" aria-labelledby="th">${[1, 2, 3].map((n) => `<button type="button" class="slotbtn" data-teach="${n}" data-vare="${esc(tv)}" data-ean="${esc(ean)}" aria-label="Gem som prio ${n}">${mark(n)}</button>`).join('')}</div></section>` : '';
     return head + `<div class="scan">
       ${r.p && r.p.billede ? `<img class="scan__img" src="${esc(r.p.billede)}" alt="" width="400" height="400">` : ''}
       <div class="verdict" role="status">${m}<div class="verdict__text"><p class="verdict__say">${esc(say)}</p><p class="meta">${esc(about || pName)}</p></div></div>
@@ -862,7 +865,20 @@
       <p>${esc(sub)}</p>
       <div class="actions">${act}${again}</div>
       ${teach}
+      <p class="meta" id="off-slot" aria-live="polite"></p>
       <p class="meta">Stregkode ${esc(ean)}</p></div>`;
+  }
+  // an unknown barcode: ask Open Food Facts what it is (needs net; fails quietly)
+  const offCache = {};
+  async function offLookup(ean) {
+    const slot = () => document.getElementById('off-slot'); const el = slot(); if (!el || byEan[ean]) return;
+    const show = (o) => { const s = slot(); if (!s || !o) return; s.textContent = `Open Food Facts siger: ${[o.brands && o.brands.split(',')[0], o.product_name, o.quantity].filter(Boolean).join(', ')}.`; const sel = document.getElementById('teachsel'); const g = sel && o.product_name ? findItems(o.product_name, 3) : []; if (g.length && !sel.querySelector('optgroup[label="Forslag"]')) sel.insertAdjacentHTML('afterbegin', `<optgroup label="Forslag">${g.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</optgroup>`); };
+    if (offCache[ean]) return show(offCache[ean]);
+    el.textContent = 'Slår varen op…';
+    try {
+      const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${ean}.json?fields=product_name,brands,quantity`, { cache: 'force-cache' }); const j = await r.json();
+      if (j.status === 1 && j.product && (j.product.product_name || j.product.brands)) { offCache[ean] = j.product; show(j.product); } else { const s = slot(); if (s) s.textContent = 'Varen findes ikke i Open Food Facts. Vælg selv, hvilken vare det er.'; }
+    } catch (e) { const s = slot(); if (s) s.textContent = ''; }
   }
 
   function spoerg(v) {
@@ -1057,8 +1073,13 @@
       if (msg) msg.textContent = 'Intet kamera';
       if (help) help.textContent = err && err.name === 'NotAllowedError' ? 'Appen må ikke bruge kameraet. Giv lov i telefonens indstillinger, eller skriv stregkoden herunder.' : err && err.message === 'nocamera' ? 'Kameraet virker kun, når appen er åbnet over https. Skriv stregkoden herunder.' : 'Kameraet kunne ikke starte. Skriv stregkoden herunder.';
     });
-    vid.addEventListener('playing', () => { if (msg) msg.textContent = 'Hold stregkoden her'; document.getElementById('viewfinder')?.classList.add('is-live'); }, { once: true });
+    vid.addEventListener('playing', () => {
+      if (msg) msg.textContent = 'Hold stregkoden her'; document.getElementById('viewfinder')?.classList.add('is-live');
+      setTimeout(() => { const t = document.querySelector('[data-torch]'); if (t && Scanner.torchOk()) t.hidden = false; }, 600);
+    }, { once: true });
+    clearTimeout(camHint); camHint = setTimeout(() => { const h = document.getElementById('cam-help'); if (h && location.hash.startsWith('#/scan') && !location.hash.includes('ean=')) h.textContent = 'Svært at læse? Hold varen 15-20 cm fra, med lys på stregerne og stregkoden vandret. Eller tag et billede af den, eller skriv tallene.'; }, 8000);
   }
+  let camHint = 0;
 
   function nyOpskrift(q) {
     const edit = q.get('ret');
@@ -1276,6 +1297,7 @@
     if (parts[0] !== 'indkob' && parts[0] !== '') qtyOpen = null;
     main.innerHTML = html;
     if (parts[0] === 'scan' && !q.get('ean')) startCamera(q.get('vare') || '');
+    else if (parts[0] === 'scan') offLookup(q.get('ean'));
     if (!parts[0] || parts[0] === 'indkob') { const pre = () => listItems().forEach((v) => { const c = card(v); if (c) [1, 2, 3].forEach((n) => { const im = imgOf(c, n); if (im && im.billede && !preloaded.has(im.billede)) { preloaded.add(im.billede); const i = new Image(); i.decoding = 'async'; i.src = im.billede; } }); }); if (window.requestIdleCallback) requestIdleCallback(pre, { timeout: 1500 }); else setTimeout(pre, 300); }
     if (parts[0] === 'teknik') { filmGo(0, false); showOwn(parts[1]); }
     if (parts[0] === 'katalog') applyFind();
@@ -1401,7 +1423,9 @@
     document.getElementById('fr-none').hidden = !!n;
   });
   main.addEventListener('change', async (e) => {
-    if (e.target.matches('[data-plan]')) { const d = e.target.dataset.plan; W().plan ||= {}; if (e.target.value === '') delete W().plan[d]; else W().plan[d] = +e.target.value; save(); rerender(); return; }
+    if (e.target.id === 'eanfoto') { const f = e.target.files && e.target.files[0]; const h = document.getElementById('cam-help'); if (!f) return; if (h) h.textContent = 'Læser billedet…'; try { const c = await Scanner.readFile(f); if (c) { Scanner.stop(); const tg = decodeURIComponent((location.hash.match(/vare=([^&]+)/) || [])[1] || ''); location.replace(`#/scan?ean=${c}${tg ? `&vare=${slug(tg)}` : ''}`); } else if (h) h.textContent = 'Kunne ikke læse stregkoden på billedet. Prøv tættere på og med lys, eller skriv tallene herunder.'; } catch (err) { if (h) h.textContent = 'Billedet kunne ikke læses. Skriv tallene herunder.'; } e.target.value = ''; return; }
+    if (e.target.matches('[data-plan]')) {
+ const d = e.target.dataset.plan; W().plan ||= {}; if (e.target.value === '') delete W().plan[d]; else W().plan[d] = +e.target.value; save(); rerender(); return; }
     if (e.target.matches('[data-remsw]')) { db.profil ||= {}; db.profil.paamind = { ...remCfg(), on: e.target.checked }; save(); rerender(); document.getElementById('remsw')?.focus({ preventScroll: true }); return; }
     if (e.target.matches('[data-remdag]')) { db.profil ||= {}; db.profil.paamind = { ...remCfg(), dag: e.target.value, tid: e.target.value === 'samme' && remCfg().tid >= '12:00' ? '07:00' : e.target.value === 'foer' && remCfg().tid < '12:00' ? '18:00' : remCfg().tid }; save(); rerender(); return; }
     if (e.target.matches('[data-remtid]')) { if (!e.target.value) return; db.profil ||= {}; db.profil.paamind = { ...remCfg(), tid: e.target.value }; save(); toast(`Påmindelsen kommer kl. ${e.target.value}.`); return; }
@@ -1514,6 +1538,7 @@
     if (e.target.closest('[data-sharepdf]') && window.__lastPdf) { navigator.share({ files: [window.__lastPdf], title: `Indkøb, ${weekLabel()}` }).catch(() => {}); return; }
     if (e.target.closest('[data-intro]')) { showIntro(); return; }
     if (e.target.closest('[data-nyt]')) { showNyt(true); return; }
+    const tb = e.target.closest('[data-torch]'); if (tb) { const on = tb.getAttribute('aria-pressed') !== 'true'; Scanner.torch(on).then((ok) => { if (ok) { tb.setAttribute('aria-pressed', on ? 'true' : 'false'); tb.textContent = on ? 'Sluk lommelygten' : 'Tænd lommelygte'; } }); return; }
     const ko = e.target.closest('[data-kost]');
     if (ko) { const pf = prof(); const k = ko.dataset.kost; pf.kost = (pf.kost || []).includes(k) ? pf.kost.filter((x) => x !== k) : [...(pf.kost || []), k]; save(); rerender(); main.querySelector(`[data-kost="${k}"]`)?.focus({ preventScroll: true }); return; }
     const al = e.target.closest('[data-allergi]');
@@ -1637,7 +1662,7 @@
     const fs = e.target.closest('[data-found-scan]');
     if (fs) { const v = fs.dataset.vare; W().ticks[v] = +fs.dataset.foundScan; if (!onList(v)) { W().extra[v] = 1; } buzz(); save(); location.hash = '#/indkob'; return; }
     const tch = e.target.closest('[data-teach]');
-    if (tch) { const v = tch.dataset.vare; const n = +tch.dataset.teach; const c = (db.cards[v] ||= { rule: 'naermeste' }); const p = byEan[tch.dataset.ean];
+    if (tch) { const v = tch.dataset.vare || document.getElementById('teachsel')?.value; if (!v) { alertLine('Vælg først, hvilken vare det er.'); document.getElementById('teachsel')?.focus(); return; } const n = +tch.dataset.teach; const c = (db.cards[v] ||= { rule: 'naermeste' }); const p = byEan[tch.dataset.ean];
       [1, 2, 3].forEach((k) => { if (c['ean' + k] === tch.dataset.ean) { c['ean' + k] = ''; c['p' + k] = ''; } });
       placeAt(c, n, p || { navn: `Scannet vare, stregkode ${tch.dataset.ean}`, ean: tch.dataset.ean }); delete c.auto; save(); buzz();
       const to = `#/scan?ean=${tch.dataset.ean}&vare=${slug(v)}`; if (location.hash === to) rerender(); else location.replace(to); alertLine(`Gemt som prio ${n} for ${v}.`); return; }
