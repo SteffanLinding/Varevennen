@@ -824,3 +824,11 @@ label.btn:has(input:focus-visible) { outline: 2px solid var(--color-focus); outl
 .group .row__open:has(.row__price) { grid-template-columns: auto minmax(0, 1fr); }
 .group .row__open:not(:has(img.row__img)):has(.row__price) { grid-template-columns: minmax(0, 1fr); }
 .group .row__price { grid-column: -2; justify-self: start; font-size: var(--text-sm); }
+/* help and profile sit together in the top bar */
+.topbar .profbtn + .profbtn { margin-left: calc(var(--space-xs) - var(--space-lg)); }
+.qtybar button:disabled { opacity: 0.4; cursor: not-allowed; }
+.intro__in.from-right { animation: from-right var(--dur-short) var(--ease-out); }
+.intro__in.from-left { animation: from-left var(--dur-short) var(--ease-out); }
+.intro__hint { text-align: center; }
+.intro { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+@media (prefers-reduced-motion: reduce) { .intro__in.from-right, .intro__in.from-left { animation: none; } }

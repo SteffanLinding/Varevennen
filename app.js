@@ -454,7 +454,7 @@
         <button class="row__tick no-print" type="button" data-tick="${esc(v)}" data-p="${best}" aria-label="${label}">${shown === 'want' ? `<span class="mark" data-p="want" aria-hidden="true">${ghost}</span>` : mark(shown)}</button>
         <a class="row__open" draggable="false" href="#/kort/${slug(v)}" data-swipe="${esc(v)}" data-prios="${prios.join(',')}"${prios.length > 1 ? ` aria-describedby="swipe-help"` : ''}>${hasCard ? thumb(imgOf(c, best), 'row__img') : itemImg(v, true) ? `<img class="row__img" src="${esc(itemImg(v, true).src)}" alt="" width="400" height="400" loading="lazy">` : ''}<span class="row__txt"><span class="row__name">${esc(v)}${qtyOf(v) > 1 ? `<span class="qty"> × ${qtyOf(v)}</span>` : ''}</span>${want}${!fromDishes().has(v) ? '<span class="row__want">Ekstra vare</span>' : ''}</span>${priceOf(v) ? `<span class="row__price num" title="${esc(priceOf(v).label)}">${priceOf(v).kind === 'ca' ? 'ca. ' : ''}${kr(priceOf(v).n * qtyOf(v))}</span>` : ''}</a>
         <button class="row__qty no-print" type="button" data-qtyopen="${esc(v)}" aria-expanded="${open}" aria-label="Antal ${esc(v)}: ${q}. Tryk for at ændre">${q > 1 ? `× ${q}` : q}</button>
-        ${open ? `<div class="qtybar no-print" role="group" aria-label="Vælg antal ${esc(v)}">${[...(fromD ? [] : [0]), 1, 2, 3, 4, 5, 6].map((n) => `<button type="button" data-setqty="${n}" data-vare="${esc(v)}" aria-pressed="${n === q}">${n === 0 ? 'Fjern' : n}</button>`).join('')}<button type="button" data-setqty="${q + 1}" data-vare="${esc(v)}" aria-label="Én mere, ${q + 1}">${icon.plus}</button></div>` : ''}
+        ${open ? `<div class="qtybar no-print" role="group" aria-label="Vælg antal ${esc(v)}"><button type="button" data-setqty="${q - 1}" data-vare="${esc(v)}" aria-label="Én mindre, ${q - 1}" ${q <= 1 && fromD ? 'disabled' : ''}>${icon.minus}</button>${[...(fromD ? [] : [0]), 1, 2, 3, 4].map((n) => `<button type="button" data-setqty="${n}" data-vare="${esc(v)}" aria-pressed="${n === q}">${n === 0 ? 'Fjern' : n}</button>`).join('')}<button type="button" data-setqty="${q + 1}" data-vare="${esc(v)}" aria-label="Én mere, ${q + 1}">${icon.plus}</button></div>` : ''}
         <span class="ticks print-only" aria-hidden="true">${[1, 2, 3, 4].map((p) => `<span class="mark" data-p="${p}">${p}</span>`).join('')}</span>
       </li>`; }).join('')}</ul></section>`).join('');
     const hb = habits(6);
@@ -1026,7 +1026,7 @@
   }
 
   // swipe a row on Indkøb to see prio 2 and 3 (arrow keys do the same)
-  let sw = null, swiped = false;
+  let sw = null, swiped = false; const preloaded = new Set();
   const swipeTo = (el, dir) => { const v = el.dataset.swipe; const ps = (el.dataset.prios || '').split(',').filter(Boolean).map(Number); if (ps.length < 2) return false; const cur = viewP[v] || ps[0]; const i = ps.indexOf(cur); const nx = ps[Math.max(0, Math.min(ps.length - 1, i + dir))]; if (nx === cur) { el.animate?.([{ transform: `translateX(${dir * -8}px)` }, { transform: 'none' }], { duration: 160 }); return false; } viewP[v] = nx; buzz(); rerender(); const n = main.querySelector(`[data-swipe="${CSS.escape(v)}"]`); n?.focus({ preventScroll: true }); n?.classList.add(dir > 0 ? 'from-right' : 'from-left'); alertLine(`${v}: prio ${nx}.`); return true; };
   main.addEventListener('dragstart', (e) => { if (e.target.closest && e.target.closest('[data-swipe]')) e.preventDefault(); });
   main.addEventListener('pointerdown', (e) => { const el = e.target.closest('[data-swipe]'); if (!el || e.button > 0) return; sw = { el, x: e.clientX, y: e.clientY, on: false }; });
@@ -1041,10 +1041,10 @@
   function hjaelp(q) {
     const t = q.get('q') || '';
     return `<div class="screen-head"><h1 tabindex="-1">Hjælp</h1><p class="lead">Søg på det, du vil gøre, fx "antal", "scan" eller "allergi".</p></div>
+      <p><button class="btn btn--quiet btn--s" type="button" data-intro>${icon.play}<span>Se introduktionen igen</span></button></p>
       <div class="field minesearch"><label class="visually-hidden" for="helpq">Søg i hjælpen</label><span class="composer__field">${icon.search}<input id="helpq" type="search" placeholder="Hvad vil du gøre?" value="${esc(t)}" autocomplete="off" data-helpsearch></span></div>
       <ul class="help-list">${HELP.map((h, i) => `<li data-q="${esc(norm(h.q + ' ' + h.a + ' ' + h.ord))}"><details${t && i === 0 ? ' open' : ''}><summary>${esc(h.q)}</summary><p>${esc(h.a)}</p><p><a class="btn btn--quiet btn--s" href="${h.link}">${esc(h.knap)}</a></p></details></li>`).join('')}</ul>
-      <p class="meta" id="help-none" hidden>Intet svar på det. Prøv et andet ord, eller se introduktionen igen.</p>
-      <p class="section"><button class="btn btn--quiet" type="button" data-intro>Se introduktionen igen</button></p>`;
+      <p class="meta" id="help-none" hidden>Intet svar på det. Prøv et andet ord, eller se introduktionen igen øverst.</p>`;
   }
   const INTRO = [
     { h: 'Velkommen til Varevennen', p: 'Appen sørger for, at den, der handler, kommer hjem med præcis den vare, I plejer at købe. Ikke bare "mælk", men jeres mælk.' },
@@ -1054,8 +1054,14 @@
   ];
   function showIntro() {
     let i = 0; const dlg = document.createElement('dialog'); dlg.className = 'intro'; dlg.setAttribute('aria-labelledby', 'intro-h');
-    const draw = () => { const s = INTRO[i]; dlg.innerHTML = `<div class="intro__in"><p class="intro__step meta">${i + 1} af ${INTRO.length}</p><h2 id="intro-h">${esc(s.h)}</h2>${s.marks ? `<div class="intro__marks">${[1, 2, 3].map((n) => `<span>${mark(n)}<small>${['Den rigtige', 'Godkendt', 'Nødløsning'][n - 1]}</small></span>`).join('')}</div>` : ''}<p>${esc(s.p)}</p><div class="intro__dots" aria-hidden="true">${INTRO.map((_, k) => `<i${k === i ? ' data-on' : ''}></i>`).join('')}</div><div class="intro__act">${i < INTRO.length - 1 ? `<button class="btn btn--quiet" type="button" data-intro-skip>Spring over</button><button class="btn btn--primary" type="button" data-intro-next>Næste</button>` : `<button class="btn btn--primary btn--wide" type="button" data-intro-skip>Kom i gang</button>`}</div></div>`; dlg.querySelector('[data-intro-next], [data-intro-skip]:last-child')?.focus(); };
-    dlg.addEventListener('click', (e) => { if (e.target.closest('[data-intro-next]')) { i++; draw(); } else if (e.target.closest('[data-intro-skip]')) dlg.close(); });
+    const draw = () => { const s = INTRO[i]; dlg.innerHTML = `<div class="intro__in"><p class="intro__step meta">${i + 1} af ${INTRO.length}</p><h2 id="intro-h">${esc(s.h)}</h2>${s.marks ? `<div class="intro__marks">${[1, 2, 3].map((n) => `<span>${mark(n)}<small>${['Den rigtige', 'Godkendt', 'Nødløsning'][n - 1]}</small></span>`).join('')}</div>` : ''}<p>${esc(s.p)}</p><div class="intro__dots" aria-hidden="true">${INTRO.map((_, k) => `<i${k === i ? ' data-on' : ''}></i>`).join('')}</div><div class="intro__act">${i > 0 ? `<button class="btn btn--quiet" type="button" data-intro-back>Tilbage</button>` : `<button class="btn btn--quiet" type="button" data-intro-skip>Spring over</button>`}${i < INTRO.length - 1 ? `<button class="btn btn--primary" type="button" data-intro-next>Næste</button>` : `<button class="btn btn--primary" type="button" data-intro-skip>Kom i gang</button>`}</div><p class="intro__hint meta">Swipe for at bladre.</p></div>`; dlg.querySelector('[data-intro-next], [data-intro-skip]:last-child')?.focus(); };
+    const go = (d) => { const n = i + d; if (n < 0 || n >= INTRO.length) return; i = n; draw(); const inn = dlg.querySelector('.intro__in'); inn.classList.add(d > 0 ? 'from-right' : 'from-left'); (dlg.querySelector('[data-intro-next]') || dlg.querySelector('[data-intro-skip]'))?.focus(); };
+    dlg.addEventListener('click', (e) => { if (e.target.closest('[data-intro-next]')) go(1); else if (e.target.closest('[data-intro-back]')) go(-1); else if (e.target.closest('[data-intro-skip]')) dlg.close(); });
+    dlg.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1); });
+    let sx = null, sy = 0;
+    dlg.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; });
+    dlg.addEventListener('pointerup', (e) => { if (sx == null) return; const dx = e.clientX - sx, dy = e.clientY - sy; sx = null; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) go(dx < 0 ? 1 : -1); });
+    dlg.addEventListener('pointercancel', () => { sx = null; });
     dlg.addEventListener('close', () => { db.introSet = true; save(); dlg.remove(); });
     document.body.append(dlg); draw(); dlg.showModal(); dlg.querySelector('[data-intro-next]')?.focus();
   }
@@ -1100,6 +1106,7 @@
     if (parts[0] !== 'indkob' && parts[0] !== '') qtyOpen = null;
     main.innerHTML = html;
     if (parts[0] === 'scan' && !q.get('ean')) startCamera(q.get('vare') || '');
+    if (!parts[0] || parts[0] === 'indkob') { const pre = () => listItems().forEach((v) => { const c = card(v); if (c) [1, 2, 3].forEach((n) => { const im = imgOf(c, n); if (im && im.billede && !preloaded.has(im.billede)) { preloaded.add(im.billede); const i = new Image(); i.decoding = 'async'; i.src = im.billede; } }); }); if (window.requestIdleCallback) requestIdleCallback(pre, { timeout: 1500 }); else setTimeout(pre, 300); }
     if (parts[0] === 'teknik') { filmGo(0, false); showOwn(parts[1]); }
     if (parts[0] === 'katalog') applyFind();
     if (q.get('vis')) requestAnimationFrame(() => document.getElementById(q.get('vis'))?.scrollIntoView({ block: 'start' }));
